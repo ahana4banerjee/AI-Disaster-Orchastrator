@@ -1,23 +1,50 @@
-# AI Disaster Response Orchestrator
+# 🌍 AI Disaster Orchestrator
 
-An autonomous AI system that monitors real-time disaster data (satellite, weather, seismic), detects early signs of threats, and coordinates response actions such as alerts, drone dispatch simulation, and relief notifications — **without human prompts**.  
-
----
-
-## 🚀 Project Overview
-The AI Disaster Response Orchestrator is designed as a **multi-agent system**:
-- **Data Monitor Agent**: Continuously pulls data from APIs (NASA FIRMS, OpenWeatherMap, USGS, etc.)
-- **Detection Module**: Uses ML models (YOLOv8 for fire detection, anomaly detection for disasters).
-- **Planner Agent**: Decides next actions (alerting, resource allocation, drone dispatch).
-- **Executor Agent**: Simulates actions (Twilio alerts, dashboard notifications, logs).
-- **Dashboard**: Streamlit-based real-time visualization of disasters, alerts, and responses.
+An AI-powered decision-support system that predicts disaster severity, estimates damage, and recommends optimal emergency resource allocation through an interactive dashboard.
 
 ---
 
-## 🛠️ Tech Stack
-- **Backend / Agents**: Python, LangChain / LangGraph  
-- **Detection**: YOLOv8, Anomaly Detection Models  
-- **APIs**: NASA FIRMS, OpenWeatherMap, USGS Earthquake API  
-- **Dashboard**: Streamlit  
-- **Alerts**: Twilio (SMS/WhatsApp), Email
+## 🚀 Overview
 
+AI Disaster Orchestrator is a full-stack intelligent system designed to assist disaster management teams in making fast, data-driven decisions.
+
+The system:
+
+- Predicts disaster severity using Machine Learning
+- Estimates potential economic damage
+- Recommends emergency resources (ambulances, rescue teams, relief camps)
+- Logs historical disaster predictions
+- Provides analytics dashboard with visualization
+- Supports scenario-based decision analysis
+
+---
+
+## 🧠 Core Features
+
+### 🔹 Disaster Prediction Engine
+- Random Forest classifier for severity prediction
+- Synthetic training dataset (extensible to real datasets)
+- Severity levels: Low, Medium, High
+- Real-time prediction via REST API
+
+### 🔹 Damage Estimation
+- Damage estimation model based on:
+  - Magnitude
+  - Population density
+  - Rainfall
+  - Infrastructure score
+
+### 🔹 Resource Allocation Engine
+- Dynamic allocation logic
+- Population-based scaling
+- Severity-aware resource recommendation
+
+### 🔹 Analytics Dashboard
+- Severity distribution chart
+- Historical disaster logs
+- Color-coded risk indicators
+- Interactive prediction form
+
+---
+
+## 🏗 Architecture
