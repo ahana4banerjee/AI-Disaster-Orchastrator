@@ -1,2 +1,29 @@
+# Virtual Environment
+venv/
+.venv/
+
+# Environment configurations
 .env
-venv
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Node / Frontend cache
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# OS metadata
+.DS_Store
+Thumbs.db
