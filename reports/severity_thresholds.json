@@ -1,0 +1,24 @@
+{
+  "weights": {
+    "deaths_weight_w1": 0.4,
+    "affected_weight_w2": 0.3,
+    "damage_weight_w3": 0.3
+  },
+  "thresholds": {
+    "P25_Low_to_Medium": 0.7199,
+    "P75_Medium_to_High": 1.8125,
+    "P95_High_to_Extreme": 3.5907
+  },
+  "statistics": {
+    "min_score": 0.0,
+    "max_score": 6.7068,
+    "mean_score": 1.4019,
+    "median_score": 1.0727
+  },
+  "class_allocations": {
+    "Medium": 8424,
+    "Low": 4216,
+    "High": 3370,
+    "Extreme": 843
+  }
+}
