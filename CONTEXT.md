@@ -11,7 +11,7 @@ The platform is designed to assist **Disaster Management Authorities (Admins)** 
 
 ### Target Dataset
 * **Source**: EM-DAT Global Disaster Database (2000-2026).
-* **Records Count**: 16,853 validated entries.
+* **Records Count**: 16,789 records successfully cleaned and ingested into MongoDB Atlas from 16,853 raw entries.
 * **Attributes**: Disaster Type/Subtype, Country/Region/Subregion, Magnitude/Scale, Lat/Long coordinates, Start/End timelines, and Impact Metrics (Deaths, Injured, Affected, Homeless, Adjusted Economic Damages).
 
 ### Core Stack
@@ -36,12 +36,18 @@ The platform is designed to assist **Disaster Management Authorities (Admins)** 
 4. **Geospatial & Compound Indexing**:
    * *What*: Structured a `2dsphere` index on `geoJSON` fields and compound indexes on `{ country: 1, disasterType: 1 }`.
    * *Why*: Accelerates radius queries for the Public "Nearby Disaster Explorer" and speeds up dashboard categorical filtering.
+5. **Idempotent Bulk Writes (Motor ReplaceOne)**:
+   * *What*: Ingestion uses Motor `bulk_write` with `ReplaceOne` operators mapping matching `disNo` fields with `upsert=True`.
+   * *Why*: Guarantees absolute ingestion idempotency, letting the ingestion pipeline rerun at any point to synchronize data updates without producing duplicate records.
+6. **Pre-Validators & Centroid Mapping**:
+   * *What*: Used Pydantic `@model_validator(mode="before")` inside schemas to resolve deaths imputation and geoJSON centroid fallbacks before instantiation.
+   * *Why*: Keeps the data-integrity layer tightly bound to database models, guaranteeing zero database pollution from missing parameters.
 
 ---
 
 ## 3. Implemented Scaffolding Map
 
-The directory tree is initialized with boilerplate imports and docker configurations:
+The directory tree includes the core backend database managers, schemas, loader modules, and administration scripts:
 
 ```
 ├── ARCHITECTURE.md          # Global System Topology, workflows, and deployment specifications
@@ -50,22 +56,30 @@ The directory tree is initialized with boilerplate imports and docker configurat
 ├── CONTEXT.md               # Master state-preservation document (This file)
 ├── docker-compose.yml       # Orchestrates Core Gateway, ML Inference, and Redis containers
 ├── backend/                 # FastAPI Core Backend orchestrator folder
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── app/                 # Routers, core config, async database, and models
-├── ml_service/              # FastAPI ML Inference microservice folder
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── main.py              # Hosts predict and similarity model servers
-├── frontend/                # Next.js React frontend layout
-│   ├── Dockerfile
-│   ├── package.json
-│   └── src/                 # Skeletons for charts, Mapbox maps, hooks, and layouts
-├── plots/eda/               # Storage directory for generated EDA visualization charts (01-14)
+│   ├── app/
+│   │   ├── core/
+│   │   │   ├── config.py    # Environment settings manager using Pydantic Settings
+│   │   │   ├── database.py  # Asynchronous MongoDB motor client lifecycle manager
+│   │   │   └── country_centroids.json # Lookup reference containing coordinates for 252 ISO centroids
+│   │   ├── models/
+│   │   │   └── schemas/
+│   │   │       └── disaster.py # Pydantic database validation schemas and pre-validators
+│   │   ├── services/
+│   │   │   ├── csv_loader.py     # Memory-efficient chunked CSV streaming reader
+│   │   │   ├── data_pipeline.py  # Data cleaning, calculation, and label partition pipeline
+│   │   │   └── bulk_ingestion.py # Idempotent motor bulk writing service
+│   │   └── main.py
+│   └── tests/
+│       └── test_disaster_schema.py # Comprehensive schema validation unit tests (100% pass)
+├── plots/eda/               # Storage directory for generated EDA visualization charts
 ├── reports/                 # Holds compiled reports
-│   └── eda_report.md        # Comprehensive analysis findings from EM-DAT CSV profiling
+│   ├── eda_report.md        # Comprehensive analysis findings from EM-DAT CSV profiling
+│   ├── ingestion_detailed_report.md # Markdown summary of inserted, skipped, and corrected records
+│   └── ingestion_details.json       # JSON log containing exact database discrepancies
 └── scripts/                 # Administration scripts
-    └── generate_eda_report.py # Automation script performing calculations and saving plots
+    ├── db_init.py           # Synchronous database collections and performance index setup
+    ├── ingest_data.py       # Asynchronous EM-DAT CSV dataset streaming ingestion script
+    └── generate_ingestion_report.py # Cross-references CSV against MongoDB and writes audit logs
 ```
 
 ---
@@ -85,9 +99,12 @@ We ran python execution pipelines on the raw CSV and established the following p
 | Challenge | Impact | Resolution |
 | :--- | :--- | :--- |
 | **Highly Skewed Target Variables** | Standard linear regression models fail to converge, and tree models overfit to outliers. | Applied a logarithmic target scale transformation: $z = \ln(y + 1)$ during training, mapping outputs back via $y = \max(0, e^z - 1)$ at inference. |
-| **Data Sparsity in Geospatial Fields** | Mapping disaster coordinates for public radius queries failed in 89% of cases. | Configured a country-centroid fallback database pipeline that resolves missing coordinates to country coordinates. |
+| **Data Sparsity in Geospatial Fields** | Mapping disaster coordinates for public radius queries failed in 89% of cases. | Configured a country-centroid fallback database pipeline that resolves missing coordinates to country coordinates using `country_centroids.json`. |
 | **Magnitude Scale Incompatibility** | Comparing Richter magnitudes with cyclone wind speeds corrupted tree split divisions. | Engineered a `Normalized_Magnitude` feature, scaling magnitude values relative to their specific `Disaster Type` group mean. |
 | **JSON Escaping Syntax Errors** | In `generate_eda_report.py`, string-escaped quotes `\"` caused SyntaxErrors during seaborn executions. | Cleaned quotes formatting, utilizing explicit double quotes `""` inside standard python scripts. |
+| **Deaths Missingness Bug** | A zero fallback inside `clean_row` was hiding null deaths from the Pydantic schema validator, causing `deaths_is_missing` to always register as `False`. | Bypassed premature zero fallback in the pipeline, letting raw `None` parameters propagate to Pydantic, allowing the model pre-validator to correctly impute `0` and set `deaths_is_missing = True`. |
+| **Chronological Date Inversion** | 60 raw records had typo entries where the `endDate` preceded the `startDate` (e.g. a disaster starting on Dec 25 but ending on Dec 1). | Implemented logical checks in `clean_row` to automatically drop chronologically inverted entries, preserving timeline integrity. |
+| **Date Parameters Missingness** | Records had missing month/day entries, resulting in invalid dates. | Imputed missing months to June (`6`) and missing days to `1`. In addition, if a day value exceeded the maximum days of its month (e.g. November 31), the pipeline dynamically clips it to the month's maximum valid day. |
 
 ---
 
@@ -104,17 +121,13 @@ We ran python execution pipelines on the raw CSV and established the following p
 When implementing the roadmap, proceed sequentially by reading the current phase description in `ROADMAP.md` and following these rules:
 
 ### How to trigger next steps:
-* To start the data pipeline, prompt: **"Start Phase 1"**.
-* To train models, prompt: **"Start Phase 2"**.
+* To start the machine learning foundation, prompt: **"Start Phase 2"**.
 
-### Phase 1: Data Pipeline Execution Guide (What to do next)
-1. Navigate to [scripts/ingest_data.py](file:///d:/Projects/Personal/AI-Disaster-Orchastrator/scripts/ingest_data.py).
-2. Code the asynchronous ingestion routine using `motor.motor_asyncio.AsyncIOMotorClient` connecting to settings in [backend/app/core/config.py](file:///d:/Projects/Personal/AI-Disaster-Orchastrator/backend/app/core/config.py).
-3. Read [data/raw/public_emdat_custom_request_2026-06-16_b4cec7bb-ec36-4c87-9762-f7cc13e97076.csv](file:///d:/Projects/Personal/AI-Disaster-Orchastrator/data/raw/public_emdat_custom_request_2026-06-16_b4cec7bb-ec36-4c87-9762-f7cc13e97076.csv).
-4. Parse date fields (`Start Year`, `Start Month`, `Start Day` -> ISO dates).
-5. Extract impacts (`Total Deaths`, `Total Affected`, `Total Damage, Adjusted ('000 US$)`) and construct nested structures matching [docs/DATABASE_DESIGN.md](file:///d:/Projects/Personal/AI-Disaster-Orchastrator/docs/DATABASE_DESIGN.md).
-6. Implement bulk writes (`bulkWrite()`) to write records into the `disaster_records` collection.
-7. Run the ingestion command using the `.venv` virtual environment:
-   ```bash
-   .\.venv\Scripts\python.exe scripts/ingest_data.py --csv data/raw/public_emdat_custom_request_2026-06-16_b4cec7bb-ec36-4c87-9762-f7cc13e97076.csv
-   ```
+### Phase 2: Machine Learning Foundation Execution Guide (What to do next)
+1. **Define ML Preprocessing Pipeline**: Create `ml_service/src/preprocessing.py` to handle target log transforms ($z = \ln(y+1)$) and GBDT category encoding.
+2. **Train Supervised Models**: Write `ml_service/train.py` using a `TimeSeriesSplit` cross-validation:
+   - Train a LightGBM multiclass classifier for `Severity_Class`.
+   - Train a multi-output XGBoost Regressor for `deaths`, `totalAffected`, and `economicDamageUSD`.
+   - Target F1-macro score $\ge 0.75$ and XGBoost MAPE $\le 20\%$.
+3. **Train Unsupervised Models**: Train a KNN Cosine Similarity index for analog search and K-Means ($K=4$) for regional risk profile clustering.
+4. **Register Pretrained Models**: Export model binaries to `ml_service/models/registry/`.
