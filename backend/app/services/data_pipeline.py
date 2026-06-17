@@ -145,7 +145,8 @@ class DisasterDataPipeline:
             return None
 
         # 3. Clean Impact Fields
-        deaths = self.parse_int(row.get("Total Deaths")) or 0
+        deaths_val = self.parse_int(row.get("Total Deaths"))
+        deaths_for_calc = deaths_val if deaths_val is not None else 0
         injured = self.parse_int(row.get("No. Injured"))
         affected = self.parse_int(row.get("No. Affected"))
         homeless = self.parse_int(row.get("No. Homeless"))
@@ -160,7 +161,7 @@ class DisasterDataPipeline:
             total_affected = calc_affected
 
         # 4. Calculate Severity
-        severity_score, severity_class = self.calculate_severity(deaths, total_affected, damage_thousands)
+        severity_score, severity_class = self.calculate_severity(deaths_for_calc, total_affected, damage_thousands)
 
         # 5. Build cleaned document
         cleaned_doc = {
@@ -179,7 +180,7 @@ class DisasterDataPipeline:
             "startDate": start_date,
             "endDate": end_date,
             "impact": {
-                "deaths": deaths,
+                "deaths": deaths_val,
                 "injured": injured,
                 "affected": affected,
                 "homeless": homeless,
