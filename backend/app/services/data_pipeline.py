@@ -3,7 +3,10 @@ import calendar
 import os
 import json
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.models.schemas.disaster import DisasterRecordCreate
 
@@ -201,3 +204,20 @@ class DisasterDataPipeline:
             return record.model_dump()
         except Exception as e:
             raise ValueError(f"Validation failed for record {dis_no}: {e}")
+
+    def clean_batch(self, batch: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+        """
+        Cleans and transforms a batch of raw CSV row dictionaries.
+        Filters out any dropped records (which return None from clean_row)
+        and skips records that fail Pydantic schema validation.
+        """
+        cleaned_batch = []
+        for row in batch:
+            try:
+                cleaned = self.clean_row(row)
+                if cleaned is not None:
+                    cleaned_batch.append(cleaned)
+            except Exception as e:
+                # Log a warning for validation failure instead of failing the entire batch
+                logger.warning(f"Skipping record {row.get('DisNo.')} due to validation error: {e}")
+        return cleaned_batch
