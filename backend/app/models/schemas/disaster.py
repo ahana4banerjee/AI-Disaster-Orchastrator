@@ -1,6 +1,22 @@
 from pydantic import BaseModel, Field, constr, model_validator
 from typing import Optional, List
 from datetime import datetime
+import json
+import os
+
+# Load country centroids
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# current_dir is backend/app/models/schemas/
+app_dir = os.path.dirname(os.path.dirname(current_dir)) # backend/app
+centroids_path = os.path.join(app_dir, "core", "country_centroids.json")
+
+centroids_data = {}
+if os.path.exists(centroids_path):
+    try:
+        with open(centroids_path, 'r', encoding='utf-8') as f:
+            centroids_data = json.load(f)
+    except Exception:
+        pass
 
 class GeoJSONPoint(BaseModel):
     type: str = Field(default="Point", pattern="^Point$")
@@ -95,6 +111,48 @@ class DisasterRecordCreate(BaseModel):
     impact: DisasterImpactSchema = Field(..., description="Casualties and economic damages sub-document")
     severityScore: Optional[float] = Field(default=None, ge=0.0, description="Derived numerical severity score")
     severityClass: Optional[str] = Field(default=None, pattern="^(Low|Medium|High|Extreme)$", description="Derived ordinal class label")
+
+    @model_validator(mode="before")
+    @classmethod
+    def fallback_country_centroids(cls, data):
+        if isinstance(data, dict):
+            geojson = data.get("geoJSON")
+            iso = data.get("iso")
+            
+            def is_valid_geojson(g):
+                if not isinstance(g, dict):
+                    return False
+                coords = g.get("coordinates")
+                if not isinstance(coords, list) or len(coords) < 2:
+                    return False
+                if coords[0] is None or coords[1] is None:
+                    return False
+                return True
+
+            if not geojson or not is_valid_geojson(geojson):
+                # Try top-level Latitude/Longitude
+                lat = data.get("Latitude") or data.get("latitude")
+                lon = data.get("Longitude") or data.get("longitude")
+                
+                try:
+                    if lat is not None and lon is not None and lat != "" and lon != "":
+                        data["geoJSON"] = {
+                            "type": "Point",
+                            "coordinates": [float(lon), float(lat)]
+                        }
+                        return data
+                except ValueError:
+                    pass
+
+                # Fallback to ISO centroid
+                if iso and iso in centroids_data:
+                    centroid = centroids_data[iso]
+                    if centroid:
+                        data["geoJSON"] = {
+                            "type": "Point",
+                            "coordinates": centroid
+                        }
+        return data
 
 class DisasterRecordResponse(DisasterRecordCreate):
     id: str = Field(..., alias="_id", description="MongoDB ObjectId hex string")
