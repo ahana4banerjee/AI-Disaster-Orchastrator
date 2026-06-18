@@ -87,8 +87,9 @@ We select a standard, high-performance stack of classical and tree-based machine
 
 | Algorithm / Model | Task | Target / Output Type | Library |
 | :--- | :--- | :--- | :--- |
-| **LightGBM Classifier** | Severity Classification | Multiclass Ordinal Category | `lightgbm` |
-| **XGBoost Regressor** (with Log-Transformed Targets) | Impact Prediction | Multi-target Continuous Values | `xgboost` |
+| **Derived Severity Classifier** (CatBoost Regressors + Dynamic Thresholds) | Severity Classification (Production) | Derived Ordinal Category | `catboost` / custom |
+| **LightGBM Classifier** (Baseline) | Severity Classification Benchmark | Multiclass Ordinal Category | `lightgbm` |
+| **Multi-Output Regressors** (CatBoost / XGBoost) | Impact Prediction | Multi-target Continuous Values | `catboost` / `xgboost` |
 | **K-Nearest Neighbors (KNN)** / Cosine Metric | Similarity Search | Index of top-k database rows | `scikit-learn` |
 | **K-Means / DBSCAN** | Regional Risk Clustering | Categorical Cluster ID | `scikit-learn` |
 
@@ -96,13 +97,10 @@ We select a standard, high-performance stack of classical and tree-based machine
 
 ## 6. Why Each Model is Chosen
 
-### 1. LightGBM (Severity Classification)
-* **Leaf-wise growth**: Handles highly imbalanced category labels extremely fast and produces sharper splits, which is useful given the highly skewed nature of disaster occurrences (many small events, few massive ones).
-* **Native Category Handling**: Native support for categorical features (Country, Disaster Type) without needing massive one-hot encoding columns, preventing memory bloat and preserving splits.
-
-### 2. XGBoost (Impact Regression)
-* **Regularization (L1/L2)**: Strongly penalizes model complexity. EMDAT records are highly noisy; XGBoost's built-in regularization mitigates overfitting to outlier events.
-* **Sparsity-aware Split Finding**: EMDAT contains significant missing data in features like `Magnitude`. XGBoost automatically learns default directions for missing values.
+### 1. Derived Severity Classifier (Production Model) & LightGBM (Baseline Model)
+* **Derived Workflow**: Predicts the individual physical impact components (deaths, affected, damages) using CatBoost/XGBoost Regressors and computes the severity score deterministically, mapping it via dynamic percentile thresholds. This provides operators with explainable, granular forecasts rather than a black-box severity class.
+* **Baseline Multiclass benchmark**: LightGBM is kept as a baseline classifier. It has fast leaf-wise growth but suffers from high false alarms (~16% Extreme class precision) when predicting highly skewed ordinal boundaries directly.
+* **Leakage-Free Feature Engineering**: Category target encoding uses out-of-fold K-Fold target encoding to prevent leakage. It also uses disaster duration (`duration_days`) to bypass sparse magnitude values in recent periods.
 
 ### 3. K-Nearest Neighbors (Historical Similarity)
 * **Exact Math**: No model training is strictly required for pure similarity search. Responders need absolute certainty that the returned events are mathematically closest in the feature space, which KNN provides directly.
@@ -199,27 +197,30 @@ EM-DAT data has substantial missingness, especially in historical economic damag
 
 ## 11. Severity Prediction Design
 
-The Severity Class predictor categorizes the overall severity of a hypothetical or occurring disaster.
+The Severity Class predictor categorizes the overall severity of a hypothetical or occurring disaster using a derived pipeline wrapper.
 
 ```mermaid
 sequenceDiagram
     participant User as Admin Portal
     participant API as Inference API
-    participant Model as LightGBM Classifier
+    participant Wrapper as DerivedSeverityClassifier
+    participant Model as Multi-Output Regressors
     participant DB as EMDAT Database
 
-    User->>API: POST /predict-severity {type, subtype, country, magnitude}
+    User->>API: POST /predict-severity {type, subtype, country, magnitude, timelines}
     API->>DB: Fetch Country Centroid & Historical Hazard Density
     DB-->>API: Centroid & Density metrics
-    API->>API: Compute Engineered Features (M_norm, seasonal sin/cos)
-    API->>Model: Execute Inference Model
-    Model-->>API: Probability vector [P_low, P_med, P_high, P_ext]
-    API->>API: Select argmax + calculate Confidence Score
-    API-->>User: Return { Severity: "High", Confidence: 0.84 }
+    API->>API: Compute Engineered Features (M_norm, duration, seasonal sin/cos)
+    API->>Wrapper: Execute Derived Classifier wrapper
+    Wrapper->>Model: Execute individual impact predictions
+    Model-->>Wrapper: Predicted log-impacts (deaths, affected, damage)
+    Wrapper->>Wrapper: Compute derived score & map via dynamic percentile thresholds
+    Wrapper-->>API: Return severity class (Low, Medium, High, Extreme)
+    API-->>User: Return { Severity: "High", ExpectedDeaths: 12, ExpectedAffected: 8500 }
 ```
 
 ### Implementation Pipeline:
-1. **Label Generation (Training Only)**:
+1. **Label Generation (Ground Truth)**:
    For every historical row, calculate $S_i$ (equation in Section 7). Divide data into 4 intervals using percentiles:
    $$\text{Label}_i = \begin{cases} 
    0 \text{ (Low)} & S_i \le P_{25} \\
@@ -227,37 +228,39 @@ sequenceDiagram
    2 \text{ (High)} & P_{75} < S_i \le P_{95} \\
    3 \text{ (Extreme)} & S_i > P_{95}
    \end{cases}$$
-2. **Model Selection**: LightGBM multiclass classifier with a multi-logloss objective function.
-3. **Post-Processing / Confidence**:
-   Calculate model prediction confidence using the output probability of the winning class:
-   $$\text{Confidence} = \max_c P(Class = c \mid X)$$
-   If $\max_c P(Class = c) < 0.40$, flag the prediction as "Low Confidence" and fall back to historical average severity for that country.
+2. **Model Selection**: Production wraps three independent CatBoost Regressors (`DerivedSeverityClassifier`). The baseline multiclass benchmark uses a direct `LGBMClassifier` with balanced class weights.
+3. **Dynamic Thresholds / Post-Processing**:
+   Instead of static thresholds which suffer from regression-to-the-mean (causing Extreme recall to drop to ~4%), thresholds are computed dynamically as the percentiles ($P_{25}, P_{75}, P_{95}$) of the model's own train-set predictions.
 
 ---
 
 ## 12. Impact Prediction Design
 
-Provides quantitative estimations of disaster outcomes.
+Provides quantitative estimations of disaster outcomes and feeds directly into the severity wrapper.
 
 ```mermaid
 graph LR
     Inputs[Input Scenario] --> Feat[Feature Pipeline]
-    Feat --> ModelReg{Multi-Output XGBoost Regressor}
+    Feat --> ModelReg{Multi-Output Regressors}
     ModelReg --> LogD[Log-Deaths Prediction]
     ModelReg --> LogA[Log-Affected Prediction]
     ModelReg --> LogP[Log-Damage Prediction]
     
-    LogD --> ExpD[Exp - 1] --> OutD[Expected Deaths]
-    LogA --> ExpA[Exp - 1] --> OutA[Expected Affected]
-    LogP --> ExpP[Exp - 1] --> OutP[Economic Damage USD]
+    LogD --> ExpD[10^x - 1] --> OutD[Expected Deaths]
+    LogA --> ExpA[10^x - 1] --> OutA[Expected Affected]
+    LogP --> ExpP[(10^x - 1)*1000] --> OutP[Economic Damage USD]
+    
+    OutD & OutA & OutP --> DerivedScore[Derived Severity Score Calculation]
+    DerivedScore --> DynamicThresholds[Dynamic Percentile Thresholding]
+    DynamicThresholds --> OutClass[Expected Severity Class]
 ```
 
 ### Mathematical Specifications
 1. **Target Scaling**: To prevent gradient explosion during tree construction due to values ranging from 0 to millions, targets are transformed:
-   $$z = \ln(y + 1)$$
-2. **Loss Function**: Mean Squared Error (MSE) on the log-transformed space. This is equivalent to optimizing the Root Mean Squared Logarithmic Error (RMSLE) in the original scale, penalizing relative errors rather than absolute errors (an error of 10 vs 100 deaths is penalized similarly to 1000 vs 10000).
+   $$z = \log_{10}(y + 1)$$
+2. **Loss Function**: Mean Squared Error (MSE) on the log-transformed space. This is equivalent to optimizing the Root Mean Squared Logarithmic Error (RMSLE) in the original scale.
 3. **Exponentiation**: Predictions are transformed back using:
-   $$\hat{y} = \max(0, e^z - 1)$$
+   $$\hat{y} = \max(0, 10^z - 1)$$
 
 ---
 
@@ -453,14 +456,14 @@ graph TD
     Split -->|Events 2000-2020| Train[Train Subset]
     Split -->|Events 2021-2026| Val[Validation Subset]
     
-    Train --> TrainLGBM[Train LightGBM Classifier]
-    Train --> TrainXGB[Train XGBoost Regressor]
+    Train --> TrainLGBM[Train LightGBM Classifier baseline]
+    Train --> TrainCatBoost[Train CatBoost Regressors production]
     
     TrainLGBM --> Eval[Metric Evaluator]
-    TrainXGB --> Eval
+    TrainCatBoost --> Eval
     
     Eval --> Check{Metrics > Baseline?}
-    Check -->|Yes| Registry[MLflow Model Registry]
+    Check -->|Yes| Registry[Models Registry]
     Check -->|No| Alert[Trigger Alert & Log Error]
 ```
 

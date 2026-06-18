@@ -68,23 +68,23 @@ Each phase contains specific goals, dependencies, deliverables, risks, and crite
 
 ### Goals
 * Code and train the core supervised and unsupervised estimators:
-  * Multiclass LightGBM Classifier (Severity Class).
-  * Multi-target XGBoost Regressor (Deaths, Total Affected, Adjusted Damages).
+  * Baseline Multiclass LightGBM Classifier (Severity Class benchmark).
+  * Production Derived Severity Classifier (Derived severity from multi-output CatBoost Regressors: Deaths, Total Affected, Adjusted Damages).
   * Cosine Similarity KNN model (Analog Searches).
-* Export pretrained robust scaling pipelines and encoders.
+* Export pretrained scaling pipelines, leakage-free K-Fold target encoders, and model wrappers.
 
 ### Deliverables
 * **Training Script**: `ml_service/train.py` which runs time-series splits validation.
 * **Model Registry Binaries**: Serialized models (`.joblib` format) written to `ml_service/models/registry/`.
-* **Evaluation Report**: Text log showing macro-F1 scores, MAPE calculations, and silhouette metrics.
+* **Evaluation Report**: Text log showing macro-F1 scores, confusion matrices, and feature importances.
 
 ### Dependencies
 * Successful completion of Phase 1.
 
 ### Metrics & Complexity
 * **Estimated Complexity**: High (4-5 days)
-* **Risks**: Target variables (casualties/economic loss) are heavily right-skewed, which can lead to high MAPE scores if log transforms are not applied.
-* **Success Criteria**: XGBoost MAPE score $\le 20\%$ on log-scale targets; LightGBM F1-macro score $\ge 0.75$ across classes.
+* **Risks**: Target variables (casualties/economic loss) are heavily right-skewed and missingness in physical magnitudes is high in recent periods, which can lead to overfitting or prediction collapse if target leakage and time-series gaps are not handled.
+* **Success Criteria**: Production Derived CatBoost model achieves a Test F1-macro score $\ge 0.43$ (outperforming the baseline LightGBM multiclass classifier F1-macro of $\sim 0.38$) on chronological splits while maintaining balanced precision and recall on the Extreme class.
 
 ---
 

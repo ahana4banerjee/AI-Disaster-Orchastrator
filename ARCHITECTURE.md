@@ -197,14 +197,14 @@ The Machine Learning inference service runs on a dedicated instance to keep reso
 ml_service/
 ├── api/
 │   └── endpoints/
-│       ├── predict.py           # Returns Severity (LGBM) & Casualties (XGBoost)
+│       ├── predict.py           # Returns Severity & Impacts via Derived Classifier
 │       └── similarity.py        # Returns Top 5 Nearest Neighbors (KNN)
 ├── models/
 │   ├── registry/                # Saved binary models (.joblib / .bin)
-│   │   ├── lgbm_severity.joblib
-│   │   ├── xgboost_impact.joblib
+│   │   ├── severity_classifier.joblib           # Production CatBoost Derived wrapper
+│   │   ├── severity_classifier_baseline.joblib  # Baseline LightGBM Multiclass Classifier
+│   │   ├── preprocessor.joblib                  # Production preprocessor (K-fold enabled)
 │   │   └── knn_similarity.joblib
-│   └── preprocessing/           # Pretrained encoders (RobustScaler, TargetEncoder)
 ├── services/
 │   └── feature_pipeline.py      # Computes cyclic month sine/cosine & target encodes
 └── main.py                      # FastAPI app entry point
@@ -212,7 +212,7 @@ ml_service/
 
 ### Runtime Details
 * **Caching Layer**: Before querying tree models, the input configuration is hashed (SHA-256) and checked against **Redis**.
-* **Model Pipeline Execution**: Implemented using pure `scikit-learn`, `xgboost`, and `lightgbm` pipelines wrapped in joblib files.
+* **Model Pipeline Execution**: Implemented using pure `scikit-learn` and `catboost` / `lightgbm` pipelines wrapped in joblib files.
 
 ---
 
@@ -322,7 +322,7 @@ graph TD
     B -->|Check Cache| C{Redis Cache}
     C -->|Hit| D[Return Prediction Directly]
     C -->|Miss| E[Forward to ML Service]
-    E -->|Execute LGBM/XGBoost| F[Generate Severity & Casualties]
+    E -->|Execute CatBoost Regressors| F[Generate Severity & Casualties]
     E -->|Cosine Similarity query| G[Extract Similar Events]
     F --> H[Merge outputs]
     G --> H
