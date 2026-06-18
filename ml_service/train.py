@@ -6,7 +6,7 @@ import pandas as pd
 from datetime import datetime
 from pymongo import MongoClient
 from lightgbm import LGBMClassifier
-from catboost import CatBoostRegressor
+from xgboost import XGBRegressor
 from sklearn.metrics import classification_report, f1_score, accuracy_score, confusion_matrix
 
 # Setup paths to import ml_service modules
@@ -148,7 +148,7 @@ def main():
     # MODEL 2: PRODUCTION DERIVED SEVERITY PIPELINE (OPTIMIZED PLAN)
     # =========================================================================
     print("\n=========================================================================")
-    print("TRAINING MODEL 2: PRODUCTION DERIVED SEVERITY PIPELINE (CATBOOST REGRESSORS)")
+    print("TRAINING MODEL 2: PRODUCTION DERIVED SEVERITY PIPELINE (XGBOOST REGRESSORS)")
     print("=========================================================================")
     
     # Log-transformed regression targets
@@ -165,11 +165,11 @@ def main():
     X_train_trans = preprocessor.fit_transform(X_train_raw, y_train_score)
     X_test_trans = preprocessor.transform(X_test_raw)
     
-    reg_deaths = CatBoostRegressor(learning_rate=0.03, iterations=300, random_seed=42, verbose=0)
-    reg_affected = CatBoostRegressor(learning_rate=0.03, iterations=300, random_seed=42, verbose=0)
-    reg_damage = CatBoostRegressor(learning_rate=0.03, iterations=300, random_seed=42, verbose=0)
+    reg_deaths = XGBRegressor(learning_rate=0.03, n_estimators=300, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42, verbosity=0)
+    reg_affected = XGBRegressor(learning_rate=0.03, n_estimators=300, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42, verbosity=0)
+    reg_damage = XGBRegressor(learning_rate=0.03, n_estimators=300, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42, verbosity=0)
     
-    print("Fitting CatBoost Regressors...")
+    print("Fitting XGBoost Regressors...")
     reg_deaths.fit(X_train_trans, y_train_deaths)
     reg_affected.fit(X_train_trans, y_train_affected)
     reg_damage.fit(X_train_trans, y_train_damage)

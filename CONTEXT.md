@@ -43,7 +43,7 @@ The platform is designed to assist **Disaster Management Authorities (Admins)** 
    * *What*: Used Pydantic `@model_validator(mode="before")` inside schemas to resolve deaths imputation and geoJSON centroid fallbacks before instantiation.
    * *Why*: Keeps the data-integrity layer tightly bound to database models, guaranteeing zero database pollution from missing parameters.
 7. **Derived Severity Pipeline (Multi-Output Regressors)**:
-   * *What*: Replaced direct multiclass classification with a derived pipeline that forecasts individual log-scale impact components ($\log_{10}(\text{deaths} + 1)$, $\log_{10}(\text{affected} + 1)$, and $\log_{10}(\text{damage} + 1)$) using CatBoost Regressors, and computes severity score deterministically, thresholded via dynamic percentiles.
+   * *What*: Replaced direct multiclass classification with a derived pipeline that forecasts individual log-scale impact components ($\log_{10}(\text{deaths} + 1)$, $\log_{10}(\text{affected} + 1)$, and $\log_{10}(\text{damage} + 1)$) using XGBoost Regressors, and computes severity score deterministically, thresholded via dynamic percentiles.
    * *Why*: Direct multiclass classification suffers from target imbalance and high variance, predicting the `Extreme` class with very low precision (~16%). Separating the task into physical outcome regressions matches the deterministic definition of severity, provides granular explainability to the user, and achieves a significantly higher test Macro F1 of **0.4375** compared to the baseline LightGBM Classifier (**0.3829**).
 
 ---
@@ -133,6 +133,6 @@ When implementing the roadmap, proceed sequentially by reading the current phase
 1. **Define ML Preprocessing Pipeline**: Maintain `ml_service/src/preprocessing.py` to handle target log transforms and category target encoding (with K-Fold out-of-fold target encoding, duration, and coordinate extraction enabled).
 2. **Train Supervised Models**: Run `ml_service/train.py` using chronological splits:
    - Train a baseline multiclass LightGBM Classifier as the baseline (`severity_classifier_baseline.joblib`).
-   - Train a production Derived Severity Pipeline utilizing CatBoost Regressors and dynamically fitted thresholding mapped via `DerivedSeverityClassifier` wrapper (`severity_classifier.joblib`).
+   - Train a production Derived Severity Pipeline utilizing XGBoost Regressors and dynamically fitted thresholding mapped via `DerivedSeverityClassifier` wrapper (`severity_classifier.joblib`).
 3. **Train Unsupervised Models**: Train a KNN Cosine Similarity index for analog search and K-Means ($K=4$) for regional risk profile clustering.
 4. **Register Pretrained Models**: Export model binaries to `ml_service/models/registry/`.

@@ -69,7 +69,7 @@ Each phase contains specific goals, dependencies, deliverables, risks, and crite
 ### Goals
 * Code and train the core supervised and unsupervised estimators:
   * Baseline Multiclass LightGBM Classifier (Severity Class benchmark).
-  * Production Derived Severity Classifier (Derived severity from multi-output CatBoost Regressors: Deaths, Total Affected, Adjusted Damages).
+  * Production Derived Severity Classifier (Derived severity from multi-output XGBoost Regressors: Deaths, Total Affected, Adjusted Damages).
   * Cosine Similarity KNN model (Analog Searches).
 * Export pretrained scaling pipelines, leakage-free K-Fold target encoders, and model wrappers.
 
@@ -84,7 +84,7 @@ Each phase contains specific goals, dependencies, deliverables, risks, and crite
 ### Metrics & Complexity
 * **Estimated Complexity**: High (4-5 days)
 * **Risks**: Target variables (casualties/economic loss) are heavily right-skewed and missingness in physical magnitudes is high in recent periods, which can lead to overfitting or prediction collapse if target leakage and time-series gaps are not handled.
-* **Success Criteria**: Production Derived CatBoost model achieves a Test F1-macro score $\ge 0.43$ (outperforming the baseline LightGBM multiclass classifier F1-macro of $\sim 0.38$) on chronological splits while maintaining balanced precision and recall on the Extreme class.
+* **Success Criteria**: Production Derived XGBoost model achieves a Test F1-macro score $\ge 0.43$ (outperforming the baseline LightGBM multiclass classifier F1-macro of $\sim 0.38$) on chronological splits while maintaining balanced precision and recall on the Extreme class.
 
 ---
 

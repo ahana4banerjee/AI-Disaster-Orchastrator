@@ -87,9 +87,9 @@ We select a standard, high-performance stack of classical and tree-based machine
 
 | Algorithm / Model | Task | Target / Output Type | Library |
 | :--- | :--- | :--- | :--- |
-| **Derived Severity Classifier** (CatBoost Regressors + Dynamic Thresholds) | Severity Classification (Production) | Derived Ordinal Category | `catboost` / custom |
+| **Derived Severity Classifier** (XGBoost Regressors + Dynamic Thresholds) | Severity Classification (Production) | Derived Ordinal Category | `xgboost` / custom |
 | **LightGBM Classifier** (Baseline) | Severity Classification Benchmark | Multiclass Ordinal Category | `lightgbm` |
-| **Multi-Output Regressors** (CatBoost / XGBoost) | Impact Prediction | Multi-target Continuous Values | `catboost` / `xgboost` |
+| **Multi-Output Regressors** (XGBoost) | Impact Prediction | Multi-target Continuous Values | `xgboost` |
 | **K-Nearest Neighbors (KNN)** / Cosine Metric | Similarity Search | Index of top-k database rows | `scikit-learn` |
 | **K-Means / DBSCAN** | Regional Risk Clustering | Categorical Cluster ID | `scikit-learn` |
 
@@ -98,7 +98,7 @@ We select a standard, high-performance stack of classical and tree-based machine
 ## 6. Why Each Model is Chosen
 
 ### 1. Derived Severity Classifier (Production Model) & LightGBM (Baseline Model)
-* **Derived Workflow**: Predicts the individual physical impact components (deaths, affected, damages) using CatBoost/XGBoost Regressors and computes the severity score deterministically, mapping it via dynamic percentile thresholds. This provides operators with explainable, granular forecasts rather than a black-box severity class.
+* **Derived Workflow**: Predicts the individual physical impact components (deaths, affected, damages) using XGBoost Regressors and computes the severity score deterministically, mapping it via dynamic percentile thresholds. This provides operators with explainable, granular forecasts rather than a black-box severity class.
 * **Baseline Multiclass benchmark**: LightGBM is kept as a baseline classifier. It has fast leaf-wise growth but suffers from high false alarms (~16% Extreme class precision) when predicting highly skewed ordinal boundaries directly.
 * **Leakage-Free Feature Engineering**: Category target encoding uses out-of-fold K-Fold target encoding to prevent leakage. It also uses disaster duration (`duration_days`) to bypass sparse magnitude values in recent periods.
 
@@ -228,7 +228,7 @@ sequenceDiagram
    2 \text{ (High)} & P_{75} < S_i \le P_{95} \\
    3 \text{ (Extreme)} & S_i > P_{95}
    \end{cases}$$
-2. **Model Selection**: Production wraps three independent CatBoost Regressors (`DerivedSeverityClassifier`). The baseline multiclass benchmark uses a direct `LGBMClassifier` with balanced class weights.
+2. **Model Selection**: Production wraps three independent XGBoost Regressors (`DerivedSeverityClassifier`). The baseline multiclass benchmark uses a direct `LGBMClassifier` with balanced class weights.
 3. **Dynamic Thresholds / Post-Processing**:
    Instead of static thresholds which suffer from regression-to-the-mean (causing Extreme recall to drop to ~4%), thresholds are computed dynamically as the percentiles ($P_{25}, P_{75}, P_{95}$) of the model's own train-set predictions.
 
@@ -457,10 +457,10 @@ graph TD
     Split -->|Events 2021-2026| Val[Validation Subset]
     
     Train --> TrainLGBM[Train LightGBM Classifier baseline]
-    Train --> TrainCatBoost[Train CatBoost Regressors production]
+    Train --> TrainXGBoost[Train XGBoost Regressors production]
     
     TrainLGBM --> Eval[Metric Evaluator]
-    TrainCatBoost --> Eval
+    TrainXGBoost --> Eval
     
     Eval --> Check{Metrics > Baseline?}
     Check -->|Yes| Registry[Models Registry]
