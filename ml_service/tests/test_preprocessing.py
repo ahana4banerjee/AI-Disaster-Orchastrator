@@ -16,7 +16,8 @@ from src.preprocessing import (
     CyclicMonthTransformer,
     GroupMagnitudeNormalizer,
     SmoothedTargetEncoder,
-    DisasterPreprocessor
+    DisasterPreprocessor,
+    SeverityLabelGenerator
 )
 
 class TestMLPreprocessing(unittest.TestCase):
@@ -156,6 +157,28 @@ class TestMLPreprocessing(unittest.TestCase):
             
             X_trans_loaded = loaded_preprocessor.transform(df)
             pd.testing.assert_frame_equal(X_trans, X_trans_loaded)
+
+    def test_severity_label_generator(self):
+        scores = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        # P25 = 0.325, P75 = 0.775, P95 = 0.955
+        
+        gen = SeverityLabelGenerator()
+        gen.fit(scores)
+        
+        labels = gen.transform([0.1, 0.3, 0.5, 0.8, 1.0])
+        expected_labels = ['Low', 'Low', 'Medium', 'High', 'Extreme']
+        np.testing.assert_array_equal(labels, expected_labels)
+        
+        # Test integer labels
+        gen_int = SeverityLabelGenerator(encode_as_int=True)
+        gen_int.fit(scores)
+        labels_int = gen_int.transform([0.1, 0.3, 0.5, 0.8, 1.0])
+        expected_ints = [0, 0, 1, 2, 3]
+        np.testing.assert_array_equal(labels_int, expected_ints)
+        
+        # Test inverse_transform
+        inv_labels = gen_int.inverse_transform(labels_int)
+        np.testing.assert_array_equal(inv_labels, expected_labels)
 
 if __name__ == '__main__':
     unittest.main()

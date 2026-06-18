@@ -231,3 +231,60 @@ class DisasterPreprocessor(BaseEstimator, TransformerMixin):
     def fit_transform(self, X, y=None):
         self.fit(X, y)
         return self.transform(X)
+
+class SeverityLabelGenerator(BaseEstimator, TransformerMixin):
+    """
+    Dynamically generates severity class labels ('Low', 'Medium', 'High', 'Extreme') 
+    from continuous severity scores using percentile thresholds computed during fit.
+    Also supports integer label encoding (0, 1, 2, 3).
+    """
+    def __init__(self, percentiles: List[float] = None, encode_as_int: bool = False):
+        if percentiles is None:
+            percentiles = [25.0, 75.0, 95.0]
+        self.percentiles = percentiles
+        self.encode_as_int = encode_as_int
+        self.thresholds_ = []
+        self.class_names = ['Low', 'Medium', 'High', 'Extreme']
+
+    def fit(self, y, sample_weight=None):
+        y_arr = np.asarray(y)
+        self.thresholds_ = [float(np.percentile(y_arr, p)) for p in self.percentiles]
+        return self
+
+    def transform(self, y):
+        if not self.thresholds_:
+            raise ValueError("SeverityLabelGenerator must be fitted before transforming.")
+            
+        y_arr = np.asarray(y)
+        labels = []
+        
+        p25, p75, p95 = self.thresholds_
+        
+        for val in y_arr:
+            if val <= p25:
+                label = 'Low'
+            elif val <= p75:
+                label = 'Medium'
+            elif val <= p95:
+                label = 'High'
+            else:
+                label = 'Extreme'
+                
+            if self.encode_as_int:
+                labels.append(self.class_names.index(label))
+            else:
+                labels.append(label)
+                
+        if isinstance(y, (pd.Series, pd.DataFrame)):
+            return pd.Series(labels, index=y.index)
+        return np.array(labels)
+
+    def inverse_transform(self, y):
+        y_arr = np.asarray(y)
+        inv_labels = []
+        for val in y_arr:
+            if self.encode_as_int:
+                inv_labels.append(self.class_names[int(val)])
+            else:
+                inv_labels.append(val)
+        return np.array(inv_labels)
