@@ -8,6 +8,8 @@ from pymongo import MongoClient
 from lightgbm import LGBMClassifier
 from xgboost import XGBRegressor
 from sklearn.metrics import classification_report, f1_score, accuracy_score, confusion_matrix
+from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import StandardScaler
 
 # Setup paths to import ml_service modules
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -61,6 +63,7 @@ def fetch_data_from_mongodb():
             "iso": r.get("iso"),
             "region": r.get("region"),
             "subregion": r.get("subregion"),
+            "location": r.get("location") or r.get("region") or "",
             "magnitude": r.get("magnitude"),
             "severityScore": r.get("severityScore"),
             "severityClass": r.get("severityClass"),
@@ -207,10 +210,48 @@ def main():
     joblib.dump(preprocessor, os.path.join(registry_dir, "preprocessor.joblib"))
     joblib.dump(label_gen, os.path.join(registry_dir, "severity_label_generator.joblib"))
     
+    # =========================================================================
+    # MODEL 3: HISTORICAL SIMILARITY SEARCH INDEX (KNN COSINE)
+    # =========================================================================
+    print("\n=========================================================================")
+    print("TRAINING MODEL 3: KNN SIMILARITY SEARCH INDEX")
+    print("=========================================================================")
+    
+    # Preprocess all records in df (full dataset) using the production preprocessor
+    X_full_trans = preprocessor.transform(df[feature_cols])
+    
+    # Select similarity features
+    similarity_features = ['subregion_encoded', 'latitude', 'longitude', 'sin_month', 'cos_month', 'magnitude_normalized']
+    X_sim = X_full_trans[similarity_features].copy()
+    
+    # Fit StandardScaler
+    sim_scaler = StandardScaler()
+    X_sim_scaled = sim_scaler.fit_transform(X_sim)
+    
+    # Fit NearestNeighbors globally (can retrieve up to 200 neighbors to allow type-filtering)
+    knn = NearestNeighbors(n_neighbors=min(200, len(X_sim_scaled)), metric='cosine', algorithm='brute')
+    knn.fit(X_sim_scaled)
+    
+    # Prepare lookup records (clean list of dicts)
+    df_lookup = df.copy()
+    df_lookup['year'] = pd.to_datetime(df_lookup['startDate'], errors='coerce').dt.year.fillna(2000).astype(int)
+    df_lookup['location'] = df_lookup['location'].fillna("")
+    
+    lookup_cols = ['disNo', 'year', 'country', 'location', 'magnitude', 'deaths', 'affected', 'damage', 'disasterType']
+    lookup_records = df_lookup[lookup_cols].to_dict(orient='records')
+    
+    # Save similarity index artifacts to registry
+    joblib.dump(knn, os.path.join(registry_dir, "knn_similarity.joblib"))
+    joblib.dump(sim_scaler, os.path.join(registry_dir, "similarity_scaler.joblib"))
+    joblib.dump(lookup_records, os.path.join(registry_dir, "similarity_records.joblib"))
+    
     print(f"\nModel registry updated successfully:")
     print(f"  - Severity Classifier (Production): {os.path.join(registry_dir, 'severity_classifier.joblib')}")
     print(f"  - Preprocessor (Production): {os.path.join(registry_dir, 'preprocessor.joblib')}")
     print(f"  - Severity Label Generator (Production): {os.path.join(registry_dir, 'severity_label_generator.joblib')}")
+    print(f"  - KNN Similarity Index (Production): {os.path.join(registry_dir, 'knn_similarity.joblib')}")
+    print(f"  - KNN Similarity Scaler (Production): {os.path.join(registry_dir, 'similarity_scaler.joblib')}")
+    print(f"  - KNN Similarity Records (Production): {os.path.join(registry_dir, 'similarity_records.joblib')}")
 
 if __name__ == "__main__":
     main()
