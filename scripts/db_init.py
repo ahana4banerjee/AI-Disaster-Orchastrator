@@ -50,7 +50,8 @@ def main():
         "scenarios",
         "resource_plans",
         "ai_reports",
-        "analytics_cache"
+        "analytics_cache",
+        "regional_risk_clusters"
     ]
 
     existing_collections = db.list_collection_names()
@@ -117,6 +118,11 @@ def main():
 
     # Collection: analytics_cache key lookup index
     db.analytics_cache.create_index([("cacheKey", ASCENDING)], name="cacheKey_lookup")
+
+    # Collection: regional_risk_clusters
+    print("Building indexes on 'regional_risk_clusters'...")
+    db.regional_risk_clusters.create_index([("subregion", ASCENDING)], unique=True)
+    print("Indexes on 'regional_risk_clusters' initialized.")
 
     print("\nMongoDB Database Schema Initialization Completed Successfully.")
 
