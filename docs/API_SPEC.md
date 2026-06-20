@@ -494,3 +494,48 @@ This document describes the API endpoints, request/response payloads, validation
 * **Endpoint**: `/api/v1/reports/{id}/pdf`
 * **Authorization**: Bearer Token (Role: `admin`)
 * **Response Schema (200 OK - file stream)**: `application/pdf` binary stream.
+
+---
+
+## 10. Analytics APIs
+
+### 10.1 Retrieve Regional Risk Clusters
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/analytics/regional-risk`
+* **Authorization**: None (Public)
+* **Response Schema (200 OK)**:
+  ```json
+  [
+    {
+      "id": "60a4f5f5f5f5f5f5f5f5f506",
+      "subregion": "Southern Asia",
+      "frequency": 3.42,
+      "mortalityRate": 0.00045,
+      "economicRisk": 0.0012,
+      "maxMagnitude": 7.8,
+      "clusterId": 3,
+      "riskTier": "Extreme",
+      "updatedAt": "2026-06-19T23:39:58Z"
+    }
+  ]
+  ```
+
+### 10.2 Retrieve Regional Risk Cluster by Subregion
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/analytics/regional-risk/{subregion}`
+* **Authorization**: None (Public)
+* **Response Schema (200 OK)**:
+  ```json
+  {
+    "id": "60a4f5f5f5f5f5f5f5f5f506",
+    "subregion": "Southern Asia",
+    "frequency": 3.42,
+    "mortalityRate": 0.00045,
+    "economicRisk": 0.0012,
+    "maxMagnitude": 7.8,
+    "clusterId": 3,
+    "riskTier": "Extreme",
+    "updatedAt": "2026-06-19T23:39:58Z"
+  }
+  ```
+

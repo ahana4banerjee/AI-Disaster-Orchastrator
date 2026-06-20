@@ -23,6 +23,7 @@ The platform uses a document-based data model optimized for clean decoupling, ge
        +---> [resource_plans]    (Estimates, available reserves, deficits)
        +---> [ai_reports]        (Situation summaries, metadata, PDF links)
        +---> [analytics_cache]   (Pre-aggregated stats for fast loading)
+       +---> [regional_risk_clusters](Subregional K-Means risk profile assignments)
 ```
 
 ### Reference vs. Embedding Policy
@@ -54,6 +55,7 @@ Indexes are optimized to minimize memory usage on MongoDB Atlas and keep query l
 | **`simulations`** | `{ "createdBy": 1, "createdAt": -1 }` | Compound | Lists user simulations |
 | **`analytics_cache`** | `{ "cacheKey": 1 }` | Single | Fast retrieval of dashboard stats |
 | | `{ "expiresAt": 1 }` | TTL | Automatically purges expired cache (expireAfterSeconds: 0) |
+| **`regional_risk_clusters`** | `{ "subregion": 1 }` | Unique Single | Fast lookup of subregional risk profile |
 
 ---
 
@@ -436,6 +438,28 @@ A pre-calculated statistical caching collection serving aggregate charts to prev
     { "disasterType": "Storm", "count": 4120, "totalDeaths": 92300, "economicDamageMillions": 92000 }
   ],
   "expiresAt": { "$date": "2026-06-17T22:30:00Z" } 
+}
+```
+
+---
+
+## 13a. Regional Risk Clusters Storage (`regional_risk_clusters`)
+
+### Purpose
+Pre-calculated regional risk profiling data compiled using the K-Means clustering model. Serves lookups for local risk profiling.
+
+### Example Document
+```json
+{
+  "_id": { "$oid": "60a4f5f5f5f5f5f5f5f5f50a" },
+  "subregion": "Southern Asia",
+  "frequency": 3.42,
+  "mortalityRate": 0.00045,
+  "economicRisk": 0.0012,
+  "maxMagnitude": 7.8,
+  "clusterId": 3,
+  "riskTier": "Extreme",
+  "updatedAt": { "$date": "2026-06-19T23:39:58Z" }
 }
 ```
 
