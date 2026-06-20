@@ -117,9 +117,9 @@ Detailed design specifications are located in the [docs/](file:///d:/Projects/Pe
 
 We follow a progressive roadmap containing clear exit milestones:
 
-* [ ] **Phase 0: Research & Data Understanding** (EM-DAT distribution analysis, severity definitions)
-* [ ] **Phase 1: Ingestion & Data Pipeline** (MongoDB bulk writes, cleaning coordinates, validation filters)
-* [ ] **Phase 2: Machine Learning Foundation** (LightGBM severity, XGBoost regression, Cosine similarity index)
+* [x] **Phase 0: Research & Data Understanding** (EM-DAT distribution analysis, severity definitions)
+* [x] **Phase 1: Ingestion & Data Pipeline** (MongoDB bulk writes, cleaning coordinates, validation filters)
+* [x] **Phase 2: Machine Learning Foundation** (LightGBM severity, XGBoost regression, Cosine similarity, K-Means clustering)
 * [ ] **Phase 3: Core API & Admin Portal Basics** (FastAPI setup, Next.js routing layouts, basic dashboard tables)
 * [ ] **Phase 4: Public Portal & Readiness Checker** (Questionnaires, risk checking components)
 * [ ] **Phase 5: Scenario Template Engine** (Comparing saved simulations side-by-side)
@@ -127,7 +127,7 @@ We follow a progressive roadmap containing clear exit milestones:
 * [ ] **Phase 7: AI Situation Report & Exports** (Markdown compilers, PDF rendering streams)
 * [ ] **Phase 8: Deployment & Optimization** (Docker Compose cluster, Redis cache checks)
 
-*Trigger sequential implementation at any time (e.g. "Start Phase 1" or "Start Phase 2" during prompts).*
+*Trigger sequential implementation at any time (e.g. "Start Phase 3" during prompts).*
 
 ---
 
