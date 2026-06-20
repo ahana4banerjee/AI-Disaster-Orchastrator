@@ -22,7 +22,7 @@ The platform is designed to assist **Disaster Management Authorities (Admins)** 
 
 ---
 
-## 2. Engineering Decisions (How & Why)
+### 2. Engineering Decisions (How & Why)
 
 1. **Clean-Sheet Restructure**:
    * *What*: We deleted all pre-existing folders and rebuilt the directory scaffolding from scratch.
@@ -44,7 +44,19 @@ The platform is designed to assist **Disaster Management Authorities (Admins)** 
    * *Why*: Keeps the data-integrity layer tightly bound to database models, guaranteeing zero database pollution from missing parameters.
 7. **Derived Severity Pipeline (Multi-Output Regressors)**:
    * *What*: Replaced direct multiclass classification with a derived pipeline that forecasts individual log-scale impact components ($\log_{10}(\text{deaths} + 1)$, $\log_{10}(\text{affected} + 1)$, and $\log_{10}(\text{damage} + 1)$) using XGBoost Regressors, and computes severity score deterministically, thresholded via dynamic percentiles.
-   * *Why*: Direct multiclass classification suffers from target imbalance and high variance, predicting the `Extreme` class with very low precision (~16%). Separating the task into physical outcome regressions matches the deterministic definition of severity, provides granular explainability to the user, and achieves a significantly higher test Macro F1 of **0.4375** compared to the baseline LightGBM Classifier (**0.3829**).
+   * *Why*: Direct multiclass classification suffers from target imbalance and high variance, predicting the `Extreme` class with very low precision (~16%). Separating the task into physical outcome regressions matches the deterministic definition of severity, provides granular explainability to the user, and achieves a significantly higher test Macro F1 of **0.4446** compared to the baseline LightGBM Classifier (**0.3829**).
+8. **Out-of-Fold Target Encoding**:
+   * *What*: Implemented custom `KFoldSmoothedTargetEncoder` inside the preprocessing pipeline.
+   * *Why*: Avoids severe target leakage by calculating out-of-fold target mappings during model training (`fit_transform`) and applying static mappings during inference (`transform`).
+9. **Dynamic Percentile Thresholding**:
+   * *What*: Fit class-splitting thresholds on the model's training set derived predictions rather than ground truth targets.
+   * *Why*: Continuous regressors suffer from regression-to-the-mean, predicting values closer to intermediate ranges. Fitting thresholds on training predictions preserves class distributions and raises the recall of extreme events.
+10. **Analog Search Cosine Similarity KNN**:
+    * *What*: Pre-fit standard scaler and `NearestNeighbors` brute-force index over 6 normalized dimensions.
+    * *Why*: Serves instant analogue lookups (<5ms) matching query vectors with the 5 closest historical disasters of the same type.
+11. **Ordinal K-Means Regional Vulnerability Clustering**:
+    * *What*: Grouped subregions into $K=4$ clusters, and sorted cluster centroids ascendingly to map cluster IDs deterministically to ordinal risk tiers (`Low`, `Medium`, `High`, `Extreme`).
+    * *Why*: Creates stable, non-random long-term vulnerability profiling stored in read-only MongoDB collections.
 
 ---
 
@@ -60,29 +72,56 @@ The directory tree includes the core backend database managers, schemas, loader 
 ├── docker-compose.yml       # Orchestrates Core Gateway, ML Inference, and Redis containers
 ├── backend/                 # FastAPI Core Backend orchestrator folder
 │   ├── app/
+│   │   ├── api/
+│   │   │   └── v1/
+│   │   │       ├── api.py           # Registers gateway endpoints and routing groups
+│   │   │       └── endpoints/
+│   │   │           ├── analytics.py  # Exposes K-Means regional risk profile lookups
+│   │   │           └── predict.py    # Proxies severity predictions to ML Service
 │   │   ├── core/
 │   │   │   ├── config.py    # Environment settings manager using Pydantic Settings
 │   │   │   ├── database.py  # Asynchronous MongoDB motor client lifecycle manager
 │   │   │   └── country_centroids.json # Lookup reference containing coordinates for 252 ISO centroids
 │   │   ├── models/
 │   │   │   └── schemas/
-│   │   │       └── disaster.py # Pydantic database validation schemas and pre-validators
+│   │   │       ├── analytics.py # Pydantic v2 schemas validating regional risk profiles
+│   │   │       └── disaster.py  # Pydantic database validation schemas and pre-validators
 │   │   ├── services/
 │   │   │   ├── csv_loader.py     # Memory-efficient chunked CSV streaming reader
 │   │   │   ├── data_pipeline.py  # Data cleaning, calculation, and label partition pipeline
 │   │   │   └── bulk_ingestion.py # Idempotent motor bulk writing service
 │   │   └── main.py
 │   └── tests/
+│       ├── test_analytics.py       # API integration tests for analytics endpoints (100% pass)
 │       └── test_disaster_schema.py # Comprehensive schema validation unit tests (100% pass)
-├── plots/eda/               # Storage directory for generated EDA visualization charts
+├── ml_service/              # Dedicated ML Microservice folder
+│   ├── api/
+│   │   └── endpoints/
+│   │       ├── predict.py    # Predicts severity scores and multi-output casualties/damages
+│   │       └── similarity.py # Runs NearestNeighbors cosine search for historical analogies
+│   │   ├── models/
+│   │   │   └── registry/     # Pre-trained joblib binaries (preprocessor, estimators, KNN)
+│   │   ├── src/
+│   │   │   ├── preprocessing.py # Preprocessor, encoders, label generators, derived pipeline wrapper
+│   │   │   └── split_strategy.py  # Chronological splitters and cross-validation folding managers
+│   │   ├── tests/
+│   │   │   ├── test_preprocessing.py   # Pipeline tests and joblib serialization checks
+│   │   │   ├── test_split_strategy.py   # Chronological splits validation
+│   │   │   ├── test_similarity.py       # KNN scaling, distances, and same-type filters
+│   │   │   └── test_clustering.py       # KMeans fitting and centroid ordinal mappings
+│   │   ├── train.py          # Supervised models and KNN offline indexing training script
+│   │   ├── evaluate.py       # Prepares performance reports on the chronological test set
+│   │   └── main.py
 ├── reports/                 # Holds compiled reports
 │   ├── eda_report.md        # Comprehensive analysis findings from EM-DAT CSV profiling
 │   ├── ingestion_detailed_report.md # Markdown summary of inserted, skipped, and corrected records
-│   └── ingestion_details.json       # JSON log containing exact database discrepancies
+│   ├── ingestion_details.json       # JSON log containing exact database discrepancies
+│   └── model_evaluation_report.md   # Performance reports, confusion matrices, and feature importances
 └── scripts/                 # Administration scripts
     ├── db_init.py           # Synchronous database collections and performance index setup
     ├── ingest_data.py       # Asynchronous EM-DAT CSV dataset streaming ingestion script
-    └── generate_ingestion_report.py # Cross-references CSV against MongoDB and writes audit logs
+    ├── generate_ingestion_report.py # Cross-references CSV against MongoDB and writes audit logs
+    └── run_clustering.py    # Subregional aggregation and KMeans risk profiling training script
 ```
 
 ---
@@ -91,7 +130,7 @@ The directory tree includes the core backend database managers, schemas, loader 
 
 We ran python execution pipelines on the raw CSV and established the following properties (documented in `reports/eda_report.md`):
 * **Data Density Limits**: Latitude and Longitude are **89.0% null**. Country centroid mapping is mandatory for geolocations.
-* **Magnitude Scales**: Magnitude is **79.8% null** and features 6 distinct incompatible scales ( Richter scale, Kph wind speed, flood Km2). Group-wise standardizations are required.
+* **Magnitude Scales**: Magnitude is **79.8% null** and features 6 distinct incompatible scales (Richter scale, Kph wind speed, flood Km2). Group-wise normalizations are required.
 * **Target Variance**: Total Deaths, total affected, and adjusted damages display skewness values exceeding **3.0**.
 * **Seasonality peak**: Event frequency peaks during summer months, illustrating weather-related hazard cycles.
 
@@ -111,6 +150,8 @@ We ran python execution pipelines on the raw CSV and established the following p
 | **Training Target Leakage** | Target encoding mapped categories to their target means using the same training records, leading to severe overfitting. | Implemented **K-Fold out-of-fold target encoding** inside the training preprocessor (`DisasterPreprocessor`) to calculate encodings without self-leakage. |
 | **Sparse Magnitude in Test Period** | Disaster magnitudes are 80-95% missing in the test period, making it a sparse feature that fails to generalize. | Engineered a **disaster duration (`duration_days`)** feature from start/end timelines, which is non-sparse, 100% available, and strongly correlates with severity. |
 | **Regression-to-the-Mean** | Continuous regressors rarely predict extreme values, causing static ground truth thresholds to yield extremely poor recall (~4%) on the `Extreme` class. | Computed **dynamic percentile thresholds** directly on the model's training predictions to preserve class distributions at inference. |
+| **Transient DNS SRV Resolution Timeouts** | Local Windows environments frequently fail to resolve hostnames on Atlas clusters. | Overrode the default resolver in Python's `dns.resolver.default_resolver` using Google (`8.8.8.8`) and Cloudflare (`1.1.1.1`) resolvers at script headers. |
+| **BSON ObjectId Serialization** | FastAPI endpoint responses fail when serializing MongoDB's native `ObjectId` structures. | Developed a custom `PyObjectId` validator using Pydantic v2 `BeforeValidator(str)` to serialize BSON ObjectIds to string variables on the fly. |
 
 ---
 
@@ -127,12 +168,12 @@ We ran python execution pipelines on the raw CSV and established the following p
 When implementing the roadmap, proceed sequentially by reading the current phase description in `ROADMAP.md` and following these rules:
 
 ### How to trigger next steps:
-* To start the machine learning foundation, prompt: **"Start Phase 2"**.
+* To start the core API and frontend dashboard initialization, prompt: **"Start Phase 3"**.
 
-### Phase 2: Machine Learning Foundation Execution Guide (What to do next)
-1. **Define ML Preprocessing Pipeline**: Maintain `ml_service/src/preprocessing.py` to handle target log transforms and category target encoding (with K-Fold out-of-fold target encoding, duration, and coordinate extraction enabled).
-2. **Train Supervised Models**: Run `ml_service/train.py` using chronological splits:
-   - Train a baseline multiclass LightGBM Classifier as the baseline (`severity_classifier_baseline.joblib`).
-   - Train a production Derived Severity Pipeline utilizing XGBoost Regressors and dynamically fitted thresholding mapped via `DerivedSeverityClassifier` wrapper (`severity_classifier.joblib`).
-3. **Train Unsupervised Models**: Train a KNN Cosine Similarity index for analog search and K-Means ($K=4$) for regional risk profile clustering.
-4. **Register Pretrained Models**: Export model binaries to `ml_service/models/registry/`.
+### Phase 3: Core API & Admin Portal Basics Execution Guide (What to do next)
+1. **Initialize Frontend**: Verify the React + Next.js + Tailwind CSS structure in `frontend/`. Install npm packages and run the local development server.
+2. **Expand Backend API Routers**: Develop the remaining core API gateways in `backend/app/api/v1/endpoints/`:
+   - Complete `auth.py` to authenticate users (JWT Tokens).
+   - Complete `predict.py` to call the ML Service inference endpoints.
+   - Complete `simulations.py` and `resources.py` to serve mock/stub data before Phase 5/6 are reached.
+3. **Build Admin Landing Dashboard**: Implement paginated views of ingested EM-DAT records and high-level KPIs cards in Next.js.
