@@ -19,16 +19,35 @@ export default function LoginPage() {
     setError("");
 
     try {
-      if (email && password) {
-        setTimeout(() => {
-          router.push("/admin/dashboard");
-        }, 800);
-      } else {
-        setError("Please enter valid credentials.");
-        setLoading(false);
+      const params = new URLSearchParams();
+      params.append("username", email);
+      params.append("password", password);
+
+      const res = await fetch("http://localhost:8000/api/v1/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Authentication failed. Verify credentials.");
       }
+
+      const data = await res.json();
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("role", data.role);
+      localStorage.setItem("email", email);
+
+      if (data.role !== "admin") {
+        throw new Error("Access restricted: Authorized administrators only.");
+      }
+
+      router.push("/admin/dashboard");
     } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+      setError(err.message || "An unexpected network error occurred.");
       setLoading(false);
     }
   };

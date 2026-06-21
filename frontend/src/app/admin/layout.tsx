@@ -31,6 +31,21 @@ export default function AdminLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const [authorized, setAuthorized] = React.useState(false);
+  const [userEmail, setUserEmail] = React.useState("eoc@agency.gov");
+
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("role");
+    const email = localStorage.getItem("email");
+
+    if (!token || role !== "admin") {
+      router.replace("/login");
+    } else {
+      setAuthorized(true);
+      if (email) setUserEmail(email);
+    }
+  }, [router]);
 
   const navigation = [
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -49,8 +64,21 @@ export default function AdminLayout({
   ];
 
   const handleLogout = () => {
-    router.push("/login");
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("email");
+    router.replace("/login");
   };
+
+  if (!authorized) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center font-sans">
+        <div className="text-xs font-mono text-text-secondary uppercase">
+          Verifying security clearance level...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary flex font-sans transition-colors duration-150">
@@ -99,8 +127,10 @@ export default function AdminLayout({
         <div className="p-4 border-t border-slate-800">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-xs font-bold text-slate-200">Emergency Ops</p>
-              <p className="text-[10px] text-slate-400">eoc@agency.gov</p>
+              <p className="text-xs font-bold text-slate-200">EOC Operator</p>
+              <p className="text-[10px] text-slate-400 font-mono truncate max-w-[150px]" title={userEmail}>
+                {userEmail}
+              </p>
             </div>
             <span className="text-[10px] bg-red-500/20 text-red-300 font-bold px-2 py-0.5 rounded-sm border border-red-500/30 uppercase tracking-wider">
               Admin

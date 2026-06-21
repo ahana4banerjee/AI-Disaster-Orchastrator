@@ -20,16 +20,26 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      if (email && password) {
-        setTimeout(() => {
-          router.push("/login");
-        }, 800);
-      } else {
-        setError("Please fill in all fields.");
-        setLoading(false);
+      const res = await fetch("http://localhost:8000/api/v1/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          role,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Registration failed. Account might already exist.");
       }
+
+      router.push("/login");
     } catch (err: any) {
-      setError(err.message || "Registration failed.");
+      setError(err.message || "An unexpected network error occurred.");
       setLoading(false);
     }
   };
