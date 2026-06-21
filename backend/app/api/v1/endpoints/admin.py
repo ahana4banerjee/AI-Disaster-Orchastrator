@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, status, Query
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
-from app.core.database import db_helper
+from app.core.database import get_db
 from app.api.v1.endpoints.auth import get_current_admin
 from app.models.schemas.disaster import DisasterRecordCreate, DisasterRecordResponse, PaginatedDisasterRecordsResponse
 from pydantic import BaseModel, Field, BeforeValidator
@@ -23,8 +23,7 @@ class AuditLogResponse(BaseModel):
     class Config:
         populate_by_name = True
 
-async def log_admin_action(admin_id: ObjectId, action: str, details: str):
-    db = db_helper.db
+async def log_admin_action(db, admin_id: ObjectId, action: str, details: str):
     if db is not None:
         await db.audit_logs.insert_one({
             "adminUserId": admin_id,
@@ -39,12 +38,9 @@ async def get_records(
     limit: int = Query(default=20, ge=1, le=100),
     country: Optional[str] = None,
     disasterType: Optional[str] = None,
-    current_admin: dict = Depends(get_current_admin)
+    current_admin: dict = Depends(get_current_admin),
+    db = Depends(get_db)
 ):
-    db = db_helper.db
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database connection not initialized")
-
     query = {}
     if country:
         query["country"] = {"$regex": f"^{country.strip()}$", "$options": "i"}
@@ -69,11 +65,11 @@ async def get_records(
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
 
 @router.post("/records", response_model=DisasterRecordResponse, status_code=status.HTTP_201_CREATED)
-async def create_record(payload: DisasterRecordCreate, current_admin: dict = Depends(get_current_admin)):
-    db = db_helper.db
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database connection not initialized")
-
+async def create_record(
+    payload: DisasterRecordCreate,
+    current_admin: dict = Depends(get_current_admin),
+    db = Depends(get_db)
+):
     # Check for duplicate disNo
     existing_record = await db.disaster_records.find_one({"disNo": payload.disNo})
     if existing_record:
@@ -107,6 +103,7 @@ async def create_record(payload: DisasterRecordCreate, current_admin: dict = Dep
         
         # Log action
         await log_admin_action(
+            db=db,
             admin_id=current_admin["_id"],
             action="CREATE_RECORD",
             details=f"Created disaster record: {payload.disNo}"
@@ -116,11 +113,11 @@ async def create_record(payload: DisasterRecordCreate, current_admin: dict = Dep
         raise HTTPException(status_code=500, detail=f"Database write error: {str(e)}")
 
 @router.delete("/records/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_record(id: str, current_admin: dict = Depends(get_current_admin)):
-    db = db_helper.db
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database connection not initialized")
-
+async def delete_record(
+    id: str,
+    current_admin: dict = Depends(get_current_admin),
+    db = Depends(get_db)
+):
     try:
         obj_id = ObjectId(id)
     except Exception:
@@ -135,6 +132,7 @@ async def delete_record(id: str, current_admin: dict = Depends(get_current_admin
         
         # Log action
         await log_admin_action(
+            db=db,
             admin_id=current_admin["_id"],
             action="DELETE_RECORD",
             details=f"Deleted disaster record: {record.get('disNo')} (ID: {id})"
@@ -147,12 +145,9 @@ async def delete_record(id: str, current_admin: dict = Depends(get_current_admin
 @router.get("/audit-logs", response_model=List[AuditLogResponse])
 async def get_audit_logs(
     limit: int = Query(default=50, ge=1, le=100),
-    current_admin: dict = Depends(get_current_admin)
+    current_admin: dict = Depends(get_current_admin),
+    db = Depends(get_db)
 ):
-    db = db_helper.db
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database connection not initialized")
-
     try:
         cursor = db.audit_logs.find({}).sort("timestamp", -1).limit(limit)
         logs = await cursor.to_list(length=limit)
