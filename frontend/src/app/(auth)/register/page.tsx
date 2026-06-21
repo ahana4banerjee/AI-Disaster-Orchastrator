@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Toast } from "@/components/ui/Toast";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function RegisterPage() {
   const [role, setRole] = useState("public_user");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "warning" | "error" } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,65 +39,83 @@ export default function RegisterPage() {
         throw new Error(errData.detail || "Registration failed. Account might already exist.");
       }
 
-      router.push("/login");
+      setToast({ message: "Registration successful! Profile registered in EOC directory.", type: "success" });
+      setTimeout(() => {
+        router.push("/login");
+      }, 1000);
     } catch (err: any) {
-      setError(err.message || "An unexpected network error occurred.");
+      let msg = err.message || "An unexpected error occurred.";
+      if (msg === "Failed to fetch") {
+        msg = "Network Connection Refused: EOC server is offline at http://localhost:8000. Verify the backend service is active.";
+      }
+      setError(msg);
+      setToast({ message: msg, type: "error" });
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <Input
-        label="Email Address"
-        type="email"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="operator@agency.gov"
-        id="email"
-      />
+    <>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <Input
+          label="Email Address"
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="operator@agency.gov"
+          id="email"
+        />
 
-      <Input
-        label="Password"
-        type="password"
-        required
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Min. 8 characters"
-        id="password"
-      />
+        <Input
+          label="Password"
+          type="password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Min. 8 characters"
+          id="password"
+        />
 
-      <Select
-        label="Account Role"
-        value={role}
-        onChange={(e) => setRole(e.target.value)}
-        id="role"
-      >
-        <option value="admin">Disaster Response Admin (EOC)</option>
-        <option value="public_user">Public Citizen Portal</option>
-      </Select>
+        <Select
+          label="Account Role"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          id="role"
+        >
+          <option value="admin">Disaster Response Admin (EOC)</option>
+          <option value="public_user">Public Citizen Portal</option>
+        </Select>
 
-      {error && (
-        <div className="text-severity-extreme text-xs bg-severity-extreme/10 border border-severity-extreme/20 rounded-xl p-3 font-semibold">
-          {error}
+        {error && (
+          <div className="text-severity-extreme text-xs bg-severity-extreme/10 border border-severity-extreme/20 rounded-xl p-3 font-semibold">
+            {error}
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full"
+        >
+          {loading ? "Registering Operator..." : "Create Agency Profile"}
+        </Button>
+
+        <div className="text-center text-xs text-text-secondary mt-6">
+          Already registered?{" "}
+          <Link href="/login" className="text-accent-primary hover:underline font-bold transition">
+            Sign In
+          </Link>
         </div>
+      </form>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
-
-      <Button
-        type="submit"
-        disabled={loading}
-        className="w-full"
-      >
-        {loading ? "Registering Operator..." : "Create Agency Profile"}
-      </Button>
-
-      <div className="text-center text-xs text-text-secondary mt-6">
-        Already registered?{" "}
-        <Link href="/login" className="text-accent-primary hover:underline font-bold transition">
-          Sign In
-        </Link>
-      </div>
-    </form>
+    </>
   );
 }
