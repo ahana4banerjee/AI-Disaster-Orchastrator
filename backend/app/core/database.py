@@ -36,8 +36,20 @@ async def close_mongo_connection():
         db_helper.client.close()
         logger.info("MongoDB connection closed.")
 
+from fastapi import HTTPException
+
 def get_database():
     """
     Get direct access to the database instance.
     """
     return db_helper.db
+
+def get_db():
+    """
+    Dependency provider to get the database instance.
+    """
+    db = db_helper.db
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database connection not initialized")
+    return db
+
