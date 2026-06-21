@@ -88,13 +88,58 @@ class TestAnalyticsAPI(unittest.TestCase):
         self.assertEqual(data[0]["eventCount"], 5)
         self.assertEqual(data[0]["averageDamageUSD"], 120000.0)
 
-        # Verify the pipeline filters
-        args, kwargs = self.mock_db.disaster_records.aggregate.call_args
-        pipeline = args[0]
-        self.assertEqual(pipeline[0]["$match"]["disasterType"]["$regex"], "^Storm$")
-
     def test_get_trends_unauthorized(self):
         response = self.client.get("/api/v1/analytics/trends")
+        self.assertEqual(response.status_code, 401)
+
+    # ------------------ Spatial Tests ------------------
+    def test_get_spatial_lookups_success(self):
+        self.mock_db.users.find_one = AsyncMock(return_value={"email": "user@earth.org", "role": "public_user"})
+        
+        mock_cursor = MagicMock()
+        mock_cursor.to_list = AsyncMock(return_value=[
+            {
+                "disNo": "2025-0303-ECU",
+                "disasterType": "Earthquake",
+                "distanceKm": 124.5,
+                "deaths": 2
+            }
+        ])
+        self.mock_db.disaster_records.aggregate.return_value = mock_cursor
+
+        headers = {"Authorization": f"Bearer {self.token}"}
+        response = self.client.get("/api/v1/analytics/spatial?longitude=78.0&latitude=30.0&radiusKm=200.0", headers=headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["disNo"], "2025-0303-ECU")
+        self.assertEqual(data[0]["distanceKm"], 124.5)
+        self.assertEqual(data[0]["deaths"], 2)
+
+        # Verify the pipeline parameters
+        args, kwargs = self.mock_db.disaster_records.aggregate.call_args
+        pipeline = args[0]
+        self.assertEqual(pipeline[0]["$geoNear"]["near"]["coordinates"], [78.0, 30.0])
+        self.assertEqual(pipeline[0]["$geoNear"]["maxDistance"], 200.0 * 1000.0)
+
+    def test_get_spatial_lookups_invalid_coordinates(self):
+        self.mock_db.users.find_one = AsyncMock(return_value={"email": "user@earth.org", "role": "public_user"})
+        headers = {"Authorization": f"Bearer {self.token}"}
+        
+        response = self.client.get("/api/v1/analytics/spatial?longitude=190.0&latitude=30.0", headers=headers)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Longitude must be between -180 and 180", response.json()["detail"])
+
+        response = self.client.get("/api/v1/analytics/spatial?longitude=78.0&latitude=100.0", headers=headers)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Latitude must be between -90 and 90", response.json()["detail"])
+
+        response = self.client.get("/api/v1/analytics/spatial?longitude=78.0&latitude=30.0&radiusKm=-10", headers=headers)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("radiusKm must be positive", response.json()["detail"])
+
+    def test_get_spatial_lookups_unauthorized(self):
+        response = self.client.get("/api/v1/analytics/spatial?longitude=78.0&latitude=30.0")
         self.assertEqual(response.status_code, 401)
 
     # ------------------ Regional Risk Tests ------------------

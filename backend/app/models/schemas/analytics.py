@@ -43,4 +43,11 @@ class TrendResponse(BaseModel):
     eventCount: int
     averageDamageUSD: float
 
+class SpatialResponse(BaseModel):
+    disNo: str
+    disasterType: str
+    distanceKm: float
+    deaths: int
+
+
 
