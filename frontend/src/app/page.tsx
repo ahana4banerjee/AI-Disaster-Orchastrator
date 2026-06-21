@@ -1,20 +1,21 @@
 import React from "react";
 import Link from "next/link";
+import { Shield, AlertCircle, FileText, ChevronRight, Activity, Globe } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-linear-to-br from-[#0f172a] via-[#0d121f] to-[#1e1b4b] text-slate-100 flex flex-col justify-between font-sans">
-      {/* Navbar */}
-      <header className="h-20 border-b border-slate-800/40 px-8 flex items-center justify-between backdrop-blur-md sticky top-0 z-55">
+    <div className="min-h-screen bg-bg-primary text-text-primary flex flex-col justify-between font-sans">
+      {/* Header Navigation */}
+      <header className="h-20 border-b border-border-custom bg-bg-secondary px-8 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 bg-linear-to-tr from-cyan-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <span className="text-white font-black text-base">Ω</span>
+          <div className="h-9 w-9 bg-accent-primary rounded-xl flex items-center justify-center text-white font-bold text-base">
+            Ω
           </div>
           <div>
-            <h1 className="font-extrabold text-sm tracking-wider uppercase">
-              Disaster Orchestrator
+            <h1 className="font-bold text-xs tracking-wider uppercase">
+              Disaster Intel
             </h1>
-            <p className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider -mt-0.5">
+            <p className="text-[10px] text-accent-secondary font-semibold uppercase tracking-wider -mt-0.5">
               Decision Support Platform
             </p>
           </div>
@@ -23,91 +24,115 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <Link
             href="/login"
-            className="text-xs font-bold text-slate-300 hover:text-white px-4 py-2 transition"
+            className="text-xs font-semibold text-text-secondary hover:text-text-primary px-4 py-2 transition"
           >
-            Sign In
+            Access Control Room
           </Link>
           <Link
             href="/register"
-            className="text-xs font-bold bg-linear-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white px-5 py-2.5 rounded-xl shadow-md transition"
-          >
-            Get Started
-          </Link>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <main className="flex-1 max-w-5xl mx-auto px-6 py-20 flex flex-col items-center justify-center text-center">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold uppercase tracking-wider mb-6 animate-pulse">
-          <span>⚡ Next Generation emergency response engine</span>
-        </div>
-
-        <h2 className="text-4xl md:text-6xl font-black tracking-tight text-white mb-6 max-w-3xl leading-tight">
-          AI-Powered{" "}
-          <span className="bg-clip-text bg-linear-to-r from-cyan-400 via-sky-400 to-indigo-400">
-            Disaster Intelligence
-          </span>{" "}
-          & Decision Support
-        </h2>
-
-        <p className="text-slate-400 text-base md:text-lg max-w-2xl mb-10 leading-relaxed">
-          Orchestrate emergency logistics, run cascading temporal step-by-step simulations, and compile AI-generated situation reports to optimize crisis response.
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-4 mb-16">
-          <Link
-            href="/login"
-            className="px-8 py-4 bg-linear-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/20 hover:scale-102 transition cursor-pointer"
-          >
-            Enter Control Room
-          </Link>
-          <Link
-            href="/register"
-            className="px-8 py-4 bg-slate-900/60 border border-slate-800 hover:bg-slate-900/80 hover:border-slate-700 text-slate-300 font-bold rounded-xl transition cursor-pointer"
+            className="text-xs font-semibold bg-accent-primary hover:bg-indigo-750 text-white px-5 py-2.5 rounded-xl transition"
           >
             Create Citizen Profile
           </Link>
         </div>
+      </header>
 
-        {/* Feature Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
-          {[
-            {
-              title: "Time-Step Simulator",
-              description: "Model cascading outages, hospital capacities, and logistics constraints over WebSockets.",
-              icon: "⚡"
-            },
-            {
-              title: "Analytics compare",
-              description: "Examine side-by-side risk matrices, historical severities, and logistical requirements.",
-              icon: "⚖️"
-            },
-            {
-              title: "AI Situation Reports",
-              description: "Compile critical operational warnings and download sitrep briefs directly as PDF logs.",
-              icon: "📋"
-            }
-          ].map((feat, idx) => (
-            <div
-              key={idx}
-              className="bg-slate-900/30 border border-slate-800/80 rounded-2xl p-6 text-left shadow-xs flex flex-col justify-between"
-            >
-              <div>
-                <span className="text-3xl bg-slate-800/30 h-12 w-12 rounded-xl flex items-center justify-center mb-4">
-                  {feat.icon}
-                </span>
-                <h4 className="text-white font-bold text-base mb-2">{feat.title}</h4>
-                <p className="text-slate-450 text-xs leading-relaxed">{feat.description}</p>
-              </div>
+      {/* Main Public Content */}
+      <main className="flex-1 max-w-5xl mx-auto px-6 py-16 flex flex-col justify-center">
+        {/* Urgent Announcement Banner */}
+        <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-lg bg-severity-extreme/10 border border-severity-extreme/20 text-severity-extreme text-xs font-semibold mb-8 max-w-fit">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>Active Command: System Monitoring Global Climatic Anomalies</span>
+        </div>
+
+        {/* Hero Title */}
+        <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-text-primary mb-6 leading-tight">
+          Operational Intelligence & <br />
+          <span className="text-accent-primary">Disaster Decision Support</span>
+        </h2>
+
+        <p className="text-text-secondary text-sm md:text-base max-w-2xl mb-12 leading-relaxed">
+          Federal-grade crisis management engine. Provides regional hazard index monitoring, cascade outages simulation, logistical deficit tracking, and automated AI situation reports (SitReps) to optimize response efficiency.
+        </p>
+
+        {/* Operational Statistics Grid */}
+        <div className="mb-16">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary mb-4">
+            Global Crisis Snapshot
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[
+              { label: "Total Events", value: "16,842", desc: "Aggregated EM-DAT historical records", icon: Globe },
+              { label: "High Risk Regions", value: "84", desc: "Active monitoring zones", icon: Shield },
+              { label: "Most Common Hazards", value: "Floods/Storms", desc: "68% of logged anomalies", icon: AlertCircle },
+              { label: "Global Impact Index", value: "CRITICAL", desc: "Combined structural severity", icon: Activity },
+            ].map((stat, idx) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={idx}
+                  className="bg-bg-secondary border border-border-custom rounded-xl p-5 shadow-xs flex flex-col justify-between h-[120px]"
+                >
+                  <div className="flex items-center justify-between text-text-secondary">
+                    <span className="text-[10px] font-bold uppercase tracking-wider">{stat.label}</span>
+                    <Icon className="h-4 w-4 text-accent-secondary" />
+                  </div>
+                  <div>
+                    <span className="text-xl font-black font-mono tracking-tight text-text-primary">
+                      {stat.value}
+                    </span>
+                    <p className="text-[9px] text-text-muted mt-0.5">{stat.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Action Panel and Preparedness Links */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+          <div className="md:col-span-2 bg-bg-secondary border border-border-custom rounded-2xl p-6 flex flex-col justify-between">
+            <div>
+              <h4 className="text-sm font-bold uppercase tracking-wider text-text-primary mb-2">
+                EOC Agency Core Operations
+              </h4>
+              <p className="text-xs text-text-secondary leading-relaxed mb-6">
+                Authorized operators can launch simulations of critical cascading failures (power grid outages, hospital overload, and road blockages) and generate standard briefs.
+              </p>
             </div>
-          ))}
+            <div className="flex flex-wrap gap-4">
+              <Link
+                href="/login"
+                className="px-5 py-2.5 bg-accent-primary hover:bg-indigo-750 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5"
+              >
+                Enter Control Room <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="bg-bg-secondary border border-border-custom rounded-2xl p-6 flex flex-col justify-between">
+            <div>
+              <h4 className="text-sm font-bold uppercase tracking-wider text-text-primary mb-2">
+                Citizen Readiness
+              </h4>
+              <p className="text-xs text-text-secondary leading-relaxed mb-6">
+                Access self-assessment checklists, calculate household preparedness scorecards, and compile structured family evacuation plans.
+              </p>
+            </div>
+            <Link
+              href="/register"
+              className="px-5 py-2.5 bg-transparent hover:bg-bg-primary text-text-primary border border-border-custom text-xs font-bold rounded-xl transition text-center"
+            >
+              Configure Profile
+            </Link>
+          </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="h-16 border-t border-slate-850 px-8 flex items-center justify-between text-xs text-slate-500">
-        <span>© 2026 Disaster Orchestrator. All rights reserved.</span>
-        <span>Secure Core v1.0.0</span>
+      <footer className="h-16 border-t border-border-custom bg-bg-secondary px-8 flex items-center justify-between text-[11px] text-text-secondary select-none">
+        <span>© 2026 Disaster Intelligence Platform. System Core v1.0.0</span>
+        <span className="font-mono">Security Level: Authorized Access Only</span>
       </footer>
     </div>
   );
