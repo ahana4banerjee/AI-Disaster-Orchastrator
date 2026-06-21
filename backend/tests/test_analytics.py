@@ -9,15 +9,67 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.main import app
 from app.core.database import get_db
+from app.core.security import create_access_token
 
 class TestAnalyticsAPI(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
         self.mock_db = MagicMock()
         app.dependency_overrides[get_db] = lambda: self.mock_db
+        self.token = create_access_token(data={"sub": "user@earth.org", "role": "public_user"})
 
     def tearDown(self):
         app.dependency_overrides.clear()
+
+    def test_get_dashboard_kpis_success(self):
+        # Mock user lookup
+        self.mock_db.users.find_one = AsyncMock(return_value={"email": "user@earth.org", "role": "public_user"})
+        
+        # Mock aggregate cursor
+        mock_cursor = MagicMock()
+        mock_cursor.to_list = AsyncMock(return_value=[
+            {
+                "totalEvents": 10,
+                "highRiskEvents": 3,
+                "averageDeaths": 12.4,
+                "averageDamageUSD": 150000.5
+            }
+        ])
+        self.mock_db.disaster_records.aggregate.return_value = mock_cursor
+
+        headers = {"Authorization": f"Bearer {self.token}"}
+        response = self.client.get("/api/v1/analytics/dashboard?country=India", headers=headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["totalEvents"], 10)
+        self.assertEqual(data["highRiskEvents"], 3)
+        self.assertEqual(data["averageDeaths"], 12.4)
+        self.assertEqual(data["averageDamageUSD"], 150000.5)
+        
+        # Verify the match filtering by country was applied
+        args, kwargs = self.mock_db.disaster_records.aggregate.call_args
+        pipeline = args[0]
+        self.assertEqual(pipeline[0]["$match"]["country"]["$regex"], "^India$")
+
+    def test_get_dashboard_kpis_no_data(self):
+        self.mock_db.users.find_one = AsyncMock(return_value={"email": "user@earth.org", "role": "public_user"})
+        
+        mock_cursor = MagicMock()
+        mock_cursor.to_list = AsyncMock(return_value=[])
+        self.mock_db.disaster_records.aggregate.return_value = mock_cursor
+
+        headers = {"Authorization": f"Bearer {self.token}"}
+        response = self.client.get("/api/v1/analytics/dashboard", headers=headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["totalEvents"], 0)
+        self.assertEqual(data["highRiskEvents"], 0)
+        self.assertEqual(data["averageDeaths"], 0.0)
+        self.assertEqual(data["averageDamageUSD"], 0.0)
+
+    def test_get_dashboard_kpis_unauthorized(self):
+        response = self.client.get("/api/v1/analytics/dashboard")
+        self.assertEqual(response.status_code, 401)
 
     def test_get_all_regional_risks_success(self):
         mock_cursor = MagicMock()

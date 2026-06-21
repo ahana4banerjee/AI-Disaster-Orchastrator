@@ -31,3 +31,10 @@ class RegionalRiskClusterResponse(BaseModel):
                 "updatedAt": "2026-06-19T23:39:58Z"
             }
         }
+
+class DashboardKPIResponse(BaseModel):
+    totalEvents: int
+    highRiskEvents: int
+    averageDeaths: float
+    averageDamageUSD: float
+
