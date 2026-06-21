@@ -57,6 +57,18 @@ The platform is designed to assist **Disaster Management Authorities (Admins)** 
 11. **Ordinal K-Means Regional Vulnerability Clustering**:
     * *What*: Grouped subregions into $K=4$ clusters, and sorted cluster centroids ascendingly to map cluster IDs deterministically to ordinal risk tiers (`Low`, `Medium`, `High`, `Extreme`).
     * *Why*: Creates stable, non-random long-term vulnerability profiling stored in read-only MongoDB collections.
+12. **EOC/FEMA Design System Alignment**:
+    * *What*: Adopted a high-density, flat EOC mission control aesthetic, utilizing Tailwind v4 custom theme mappings mapped to solid color CSS variables.
+    * *Why*: Establishes institutional trust and authority, removing generic SaaS startup glassmorphism, neon decorations, and emojis.
+13. **Next.js Client-Side Route Guards**:
+    * *What*: Mounted authorization hook validation inside the administrative portal layout `admin/layout.tsx`.
+    * *Why*: Intercepts unauthenticated sessions and redirects unauthorized browser requests immediately to the `/login` view.
+14. **Form URL-Encoded Session Logins**:
+    * *What*: Configured the client login handler to dispatch params as `application/x-www-form-urlencoded` parameters.
+    * *Why*: Bypasses FastAPI's `OAuth2PasswordRequestForm` 422 parser validation failures when payloads are sent as JSON.
+15. **Recharts SSR Hydration Guards**:
+    * *What*: Wrapped Recharts components inside stateful client mounting checks (`mounted` check triggered via `useEffect`).
+    * *Why*: Prevents Next.js Server-Side Rendering (SSR) hydration mismatches caused by SVG responsive calculations during page collection.
 
 ---
 
@@ -122,6 +134,34 @@ The directory tree includes the core backend database managers, schemas, loader 
     ├── ingest_data.py       # Asynchronous EM-DAT CSV dataset streaming ingestion script
     ├── generate_ingestion_report.py # Cross-references CSV against MongoDB and writes audit logs
     └── run_clustering.py    # Subregional aggregation and KMeans risk profiling training script
+├── frontend/                # Next.js Frontend application folder
+    ├── src/
+    │   ├── app/
+    │   │   ├── (auth)/      # Secure login/registration gateway screens
+    │   │   │   ├── layout.tsx
+    │   │   │   ├── login/page.tsx
+    │   │   │   └── register/page.tsx
+    │   │   ├── admin/       # Tactical command room sub-routes (Phase 3)
+    │   │   │   ├── layout.tsx
+    │   │   │   ├── page.tsx          # Client redirect
+    │   │   │   ├── dashboard/page.tsx # EOC KPI charts & live feeds
+    │   │   │   ├── records/page.tsx   # Paginated disaster datatable grid
+    │   │   │   ├── simulation/page.tsx # Interactive timesteps progression center
+    │   │   │   └── [analytics, predictor, similarity, risk-intelligence, cross-border, resources, scenarios, reports, settings, profile] # EOC Placeholder Panels
+    │   │   ├── globals.css  # Tailwind v4 theme variables configurations
+    │   │   └── layout.tsx   # ThemeProvider root configurations
+    │   ├── components/
+    │   │   └── ui/          # Reusable EOC design system components
+    │   │       ├── Button.tsx
+    │   │       ├── Input.tsx
+    │   │       ├── Card.tsx
+    │   │       ├── SeverityBadge.tsx
+    │   │       ├── Skeleton.tsx
+    │   │       └── Toast.tsx
+    │   └── contexts/
+    │       └── ThemeContext.tsx # Toggles HTML dark/light variables
+    ├── package.json         # Lists Recharts and Lucide dependencies
+    └── tsconfig.json
 ```
 
 ---
@@ -152,6 +192,10 @@ We ran python execution pipelines on the raw CSV and established the following p
 | **Regression-to-the-Mean** | Continuous regressors rarely predict extreme values, causing static ground truth thresholds to yield extremely poor recall (~4%) on the `Extreme` class. | Computed **dynamic percentile thresholds** directly on the model's training predictions to preserve class distributions at inference. |
 | **Transient DNS SRV Resolution Timeouts** | Local Windows environments frequently fail to resolve hostnames on Atlas clusters. | Overrode the default resolver in Python's `dns.resolver.default_resolver` using Google (`8.8.8.8`) and Cloudflare (`1.1.1.1`) resolvers at script headers. |
 | **BSON ObjectId Serialization** | FastAPI endpoint responses fail when serializing MongoDB's native `ObjectId` structures. | Developed a custom `PyObjectId` validator using Pydantic v2 `BeforeValidator(str)` to serialize BSON ObjectIds to string variables on the fly. |
+| **Wildcard CORS with Credentials** | JavaScript fetches failed on credentialed endpoints when backend CORS origins were wildcarded `["*"]`. | Replaced the wildcard origin in FastAPI's `CORSMiddleware` with explicit frontend URLs (`http://localhost:3000`, `http://127.0.0.1:3000`). |
+| **OAuth2 Form Login Payloads** | FastAPI's `OAuth2PasswordRequestForm` throws 422 validations if credential objects are POSTed as JSON objects. | Rewrote the login handler to construct `URLSearchParams` and submit with the `application/x-www-form-urlencoded` header. |
+| **Recharts SSR Hydration** | Dynamic SVG calculations in Recharts triggered hydration mismatches during Next.js page generation. | Wrapped Recharts elements inside React state hooks (`mounted` check in `useEffect`), fallback-rendering EOC KPI skeletons when not mounted. |
+| **Route Path Name Mismatches** | Navigating to EOC coordinates `/admin/simulation` resulted in 404s due to a pluralized directory name (`simulations`). | Consolidated directories, renaming and refactoring paths to a singular `simulation/page.tsx` route matching the sidebar array. |
 
 ---
 
@@ -168,12 +212,10 @@ We ran python execution pipelines on the raw CSV and established the following p
 When implementing the roadmap, proceed sequentially by reading the current phase description in `ROADMAP.md` and following these rules:
 
 ### How to trigger next steps:
-* To start the core API and frontend dashboard initialization, prompt: **"Start Phase 3"**.
+* To start the public citizen-facing portal and readiness scoring logic, prompt: **"Start Phase 4"**.
 
-### Phase 3: Core API & Admin Portal Basics Execution Guide (What to do next)
-1. **Initialize Frontend**: Verify the React + Next.js + Tailwind CSS structure in `frontend/`. Install npm packages and run the local development server.
-2. **Expand Backend API Routers**: Develop the remaining core API gateways in `backend/app/api/v1/endpoints/`:
-   - Complete `auth.py` to authenticate users (JWT Tokens).
-   - Complete `predict.py` to call the ML Service inference endpoints.
-   - Complete `simulations.py` and `resources.py` to serve mock/stub data before Phase 5/6 are reached.
-3. **Build Admin Landing Dashboard**: Implement paginated views of ingested EM-DAT records and high-level KPIs cards in Next.js.
+### Phase 4: Public Portal & Readiness Checker Execution Guide (What to do next)
+1. **Initialize Public Portal route group**: Move public portal routes under the Next.js `src/app/(public)/` route group to share a common `PublicLayout` containing EOC navbar headers and footers.
+2. **Build Risk Checker**: Create coordinates and country lookup forms, sending queries to the FastAPI `/api/v1/analytics/spatial` geospatial lookup API, and displaying regional threats.
+3. **Build Readiness Assessment**: Implement the multi-step questionnaire that calculates the citizen readiness index (0–100) and saves the results in the MongoDB `readiness_profiles` collection.
+4. **Create Family Planner**: Build the tabbed planning panel (Household, Contacts, Evacuation, Medical) and wire the PDF export button to download the printable evacuation brief.
