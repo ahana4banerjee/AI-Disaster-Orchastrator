@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from app.core.database import get_db
-from app.models.schemas.analytics import RegionalRiskClusterResponse, DashboardKPIResponse
+from app.models.schemas.analytics import RegionalRiskClusterResponse, DashboardKPIResponse, TrendResponse
 from app.api.v1.endpoints.auth import get_current_user
 
 router = APIRouter()
@@ -61,6 +61,55 @@ async def get_dashboard_kpis(
             "averageDeaths": round(res.get("averageDeaths") or 0.0, 1),
             "averageDamageUSD": round(res.get("averageDamageUSD") or 0.0, 2)
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database aggregation error: {str(e)}")
+
+@router.get("/trends", response_model=List[TrendResponse])
+async def get_year_wise_trends(
+    disasterType: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """
+    Retrieve year-wise disaster trends.
+    Supports filtering by disasterType.
+    """
+    match_stage = {"startDate": {"$type": "date"}}
+    if disasterType:
+        match_stage["disasterType"] = {"$regex": f"^{disasterType.strip()}$", "$options": "i"}
+        
+    pipeline = [
+        {"$match": match_stage},
+        {
+            "$group": {
+                "_id": {"$year": "$startDate"},
+                "eventCount": {"$sum": 1},
+                "averageDamageUSD": {"$avg": "$impact.economicDamageUSD"}
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "year": "$_id",
+                "eventCount": 1,
+                "averageDamageUSD": 1
+            }
+        },
+        {"$sort": {"year": 1}}
+    ]
+    
+    try:
+        cursor = db.disaster_records.aggregate(pipeline)
+        results = await cursor.to_list(length=100)
+        
+        trends = []
+        for r in results:
+            trends.append({
+                "year": r["year"],
+                "eventCount": r["eventCount"],
+                "averageDamageUSD": round(r.get("averageDamageUSD") or 0.0, 2)
+            })
+        return trends
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database aggregation error: {str(e)}")
 

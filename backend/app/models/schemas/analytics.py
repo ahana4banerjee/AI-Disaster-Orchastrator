@@ -38,3 +38,9 @@ class DashboardKPIResponse(BaseModel):
     averageDeaths: float
     averageDamageUSD: float
 
+class TrendResponse(BaseModel):
+    year: int
+    eventCount: int
+    averageDamageUSD: float
+
+
