@@ -1,7 +1,7 @@
 import os
 import sys
 import unittest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock
 from fastapi import status
 from fastapi.testclient import TestClient
 
@@ -10,25 +10,25 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.main import app
 from app.core.security import create_access_token
+from app.core.database import get_db
 
 class TestAdminAPI(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
         self.admin_token = create_access_token(data={"sub": "admin@earth.org", "role": "admin"})
         self.user_token = create_access_token(data={"sub": "user@earth.org", "role": "public_user"})
+        self.mock_db = MagicMock()
+        app.dependency_overrides[get_db] = lambda: self.mock_db
 
-    @patch('app.api.v1.endpoints.auth.db_helper')
-    @patch('app.api.v1.endpoints.admin.db_helper')
-    def test_get_records_success(self, mock_admin_db_helper, mock_auth_db_helper):
-        mock_db = MagicMock()
-        mock_admin_db_helper.db = mock_db
-        mock_auth_db_helper.db = mock_db
-        
+    def tearDown(self):
+        app.dependency_overrides.clear()
+
+    def test_get_records_success(self):
         # Mock auth find_one finding the admin user
-        mock_db.users.find_one = AsyncMock(return_value={"email": "admin@earth.org", "role": "admin"})
+        self.mock_db.users.find_one = AsyncMock(return_value={"email": "admin@earth.org", "role": "admin"})
         
         # Mock total document count
-        mock_db.disaster_records.count_documents = AsyncMock(return_value=1)
+        self.mock_db.disaster_records.count_documents = AsyncMock(return_value=1)
         
         # Mock cursor find to return a record list
         mock_cursor = MagicMock()
@@ -54,7 +54,7 @@ class TestAdminAPI(unittest.TestCase):
             }
         ]
         mock_cursor.sort.return_value.skip.return_value.limit.return_value.to_list = AsyncMock(return_value=mock_records)
-        mock_db.disaster_records.find = MagicMock(return_value=mock_cursor)
+        self.mock_db.disaster_records.find = MagicMock(return_value=mock_cursor)
 
         headers = {"Authorization": f"Bearer {self.admin_token}"}
         response = self.client.get("/api/v1/admin/records?page=1&limit=20", headers=headers)
@@ -66,35 +66,23 @@ class TestAdminAPI(unittest.TestCase):
         self.assertEqual(data["totalPages"], 1)
         self.assertEqual(data["data"][0]["disNo"], "2026-0153-KEN")
 
-    @patch('app.api.v1.endpoints.auth.db_helper')
-    @patch('app.api.v1.endpoints.admin.db_helper')
-    def test_get_records_forbidden_for_public_user(self, mock_admin_db_helper, mock_auth_db_helper):
-        mock_db = MagicMock()
-        mock_admin_db_helper.db = mock_db
-        mock_auth_db_helper.db = mock_db
-        
+    def test_get_records_forbidden_for_public_user(self):
         # Mock auth lookup finding a standard public user
-        mock_db.users.find_one = AsyncMock(return_value={"email": "user@earth.org", "role": "public_user"})
+        self.mock_db.users.find_one = AsyncMock(return_value={"email": "user@earth.org", "role": "public_user"})
 
         headers = {"Authorization": f"Bearer {self.user_token}"}
         response = self.client.get("/api/v1/admin/records", headers=headers)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertIn("administrative accounts", response.json()["detail"])
 
-    @patch('app.api.v1.endpoints.auth.db_helper')
-    @patch('app.api.v1.endpoints.admin.db_helper')
-    def test_create_record_success(self, mock_admin_db_helper, mock_auth_db_helper):
-        mock_db = MagicMock()
-        mock_admin_db_helper.db = mock_db
-        mock_auth_db_helper.db = mock_db
-        
-        mock_db.users.find_one = AsyncMock(return_value={"_id": "60a4f5f5f5f5f5f5f5f5f500", "email": "admin@earth.org", "role": "admin"})
-        mock_db.disaster_records.find_one = AsyncMock(return_value=None)
+    def test_create_record_success(self):
+        self.mock_db.users.find_one = AsyncMock(return_value={"_id": "60a4f5f5f5f5f5f5f5f5f500", "email": "admin@earth.org", "role": "admin"})
+        self.mock_db.disaster_records.find_one = AsyncMock(return_value=None)
         
         mock_insert_result = MagicMock()
         mock_insert_result.inserted_id = "60a4f5f5f5f5f5f5f5f5f501"
-        mock_db.disaster_records.insert_one = AsyncMock(return_value=mock_insert_result)
-        mock_db.audit_logs.insert_one = AsyncMock(return_value=None)
+        self.mock_db.disaster_records.insert_one = AsyncMock(return_value=mock_insert_result)
+        self.mock_db.audit_logs.insert_one = AsyncMock(return_value=None)
 
         payload = {
             "disNo": "2026-9999-IND",
@@ -129,35 +117,22 @@ class TestAdminAPI(unittest.TestCase):
         self.assertEqual(data["disNo"], "2026-9999-IND")
         self.assertIn("severityScore", data)
         self.assertEqual(data["severityClass"], "High") # Calculated dynamically based on 12 deaths and 2500 affected
-        self.assertTrue(mock_db.audit_logs.insert_one.called)
+        self.assertTrue(self.mock_db.audit_logs.insert_one.called)
 
-    @patch('app.api.v1.endpoints.auth.db_helper')
-    @patch('app.api.v1.endpoints.admin.db_helper')
-    def test_delete_record_success(self, mock_admin_db_helper, mock_auth_db_helper):
-        from bson import ObjectId
-        mock_db = MagicMock()
-        mock_admin_db_helper.db = mock_db
-        mock_auth_db_helper.db = mock_db
-        
-        mock_db.users.find_one = AsyncMock(return_value={"_id": "60a4f5f5f5f5f5f5f5f5f500", "email": "admin@earth.org", "role": "admin"})
-        mock_db.disaster_records.find_one = AsyncMock(return_value={"disNo": "2026-0153-KEN"})
-        mock_db.disaster_records.delete_one = AsyncMock(return_value=None)
-        mock_db.audit_logs.insert_one = AsyncMock(return_value=None)
+    def test_delete_record_success(self):
+        self.mock_db.users.find_one = AsyncMock(return_value={"_id": "60a4f5f5f5f5f5f5f5f5f500", "email": "admin@earth.org", "role": "admin"})
+        self.mock_db.disaster_records.find_one = AsyncMock(return_value={"disNo": "2026-0153-KEN"})
+        self.mock_db.disaster_records.delete_one = AsyncMock(return_value=None)
+        self.mock_db.audit_logs.insert_one = AsyncMock(return_value=None)
 
         headers = {"Authorization": f"Bearer {self.admin_token}"}
         response = self.client.delete("/api/v1/admin/records/60a4f5f5f5f5f5f5f5f5f501", headers=headers)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertTrue(mock_db.disaster_records.delete_one.called)
-        self.assertTrue(mock_db.audit_logs.insert_one.called)
+        self.assertTrue(self.mock_db.disaster_records.delete_one.called)
+        self.assertTrue(self.mock_db.audit_logs.insert_one.called)
 
-    @patch('app.api.v1.endpoints.auth.db_helper')
-    @patch('app.api.v1.endpoints.admin.db_helper')
-    def test_get_audit_logs_success(self, mock_admin_db_helper, mock_auth_db_helper):
-        mock_db = MagicMock()
-        mock_admin_db_helper.db = mock_db
-        mock_auth_db_helper.db = mock_db
-        
-        mock_db.users.find_one = AsyncMock(return_value={"email": "admin@earth.org", "role": "admin"})
+    def test_get_audit_logs_success(self):
+        self.mock_db.users.find_one = AsyncMock(return_value={"email": "admin@earth.org", "role": "admin"})
         
         mock_cursor = MagicMock()
         mock_logs = [
@@ -170,7 +145,7 @@ class TestAdminAPI(unittest.TestCase):
             }
         ]
         mock_cursor.sort.return_value.limit.return_value.to_list = AsyncMock(return_value=mock_logs)
-        mock_db.audit_logs.find = MagicMock(return_value=mock_cursor)
+        self.mock_db.audit_logs.find = MagicMock(return_value=mock_cursor)
 
         headers = {"Authorization": f"Bearer {self.admin_token}"}
         response = self.client.get("/api/v1/admin/audit-logs?limit=50", headers=headers)
