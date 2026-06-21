@@ -1,6 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, BeforeValidator
+from typing_extensions import Annotated
 from typing import Optional, List
 from datetime import datetime
+
+PyObjectId = Annotated[str, BeforeValidator(str)]
 
 class SimulationCreate(BaseModel):
     scenarioId: str = Field(..., description="Target Scenario Configuration ID")
@@ -25,7 +28,7 @@ class SimulationTimestepSchema(BaseModel):
     infrastructureStates: InfrastructureStatesSchema
 
 class SimulationResponse(BaseModel):
-    id: str = Field(..., alias="_id", description="MongoDB ObjectId hex string")
+    id: PyObjectId = Field(..., alias="_id", description="MongoDB ObjectId hex string")
     scenarioId: str
     name: str
     createdBy: str

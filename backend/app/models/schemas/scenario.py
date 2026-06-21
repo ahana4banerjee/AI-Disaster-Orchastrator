@@ -1,6 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, BeforeValidator
+from typing_extensions import Annotated
 from typing import Optional
 from datetime import datetime
+
+PyObjectId = Annotated[str, BeforeValidator(str)]
 
 class ScenarioCreate(BaseModel):
     name: str = Field(..., description="Unique scenario template name")
@@ -13,7 +16,7 @@ class ScenarioCreate(BaseModel):
     magnitudeScale: Optional[str] = Field(None, description="Measurement scale (e.g. Kph, Richter)")
 
 class ScenarioResponse(ScenarioCreate):
-    id: str = Field(..., alias="_id", description="MongoDB ObjectId hex string")
+    id: PyObjectId = Field(..., alias="_id", description="MongoDB ObjectId hex string")
     createdBy: str = Field(..., description="User ID of the creating admin")
     createdAt: datetime
 
