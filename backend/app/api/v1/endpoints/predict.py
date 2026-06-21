@@ -2,6 +2,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from app.core.config import settings
+from app.api.v1.endpoints.auth import get_current_user
 
 router = APIRouter()
 
@@ -20,7 +21,7 @@ class DisasterSimilarityPayload(BaseModel):
     magnitude: float = Field(..., gt=0, example=220.0)
 
 @router.post("/impact")
-async def predict_impact(payload: DisasterPredictionPayload):
+async def predict_impact(payload: DisasterPredictionPayload, current_user: dict = Depends(get_current_user)):
     """
     Forwards the disaster parameters to the ML service to obtain predicted severity class and impacts.
     """
@@ -35,7 +36,7 @@ async def predict_impact(payload: DisasterPredictionPayload):
             raise HTTPException(status_code=503, detail=f"Failed to communicate with ML service: {str(e)}")
 
 @router.post("/similarity")
-async def search_similarity(payload: DisasterSimilarityPayload):
+async def search_similarity(payload: DisasterSimilarityPayload, current_user: dict = Depends(get_current_user)):
     """
     Forwards query parameters to the ML service to search similar historical events.
     """
@@ -48,3 +49,4 @@ async def search_similarity(payload: DisasterSimilarityPayload):
             return resp.json()
         except httpx.RequestError as e:
             raise HTTPException(status_code=503, detail=f"Failed to communicate with ML service: {str(e)}")
+

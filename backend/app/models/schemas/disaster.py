@@ -162,3 +162,10 @@ class DisasterRecordResponse(DisasterRecordCreate):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+
+class PaginatedDisasterRecordsResponse(BaseModel):
+    totalCount: int
+    page: int
+    totalPages: int
+    data: List[DisasterRecordResponse]
+
