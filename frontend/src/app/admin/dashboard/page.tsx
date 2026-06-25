@@ -38,6 +38,20 @@ export default function AdminDashboard() {
     avgFatalities: { value: "28.5", trend: "-3.1%", isUp: false },
     avgDamages: { value: "$1.45M", trend: "+4.2%", isUp: true }
   });
+  const [trendData, setTrendData] = useState<any[]>([
+    { year: "2020", events: 320, damages: 1.1 },
+    { year: "2021", events: 340, damages: 1.3 },
+    { year: "2022", events: 380, damages: 1.6 },
+    { year: "2023", events: 410, damages: 1.4 },
+    { year: "2024", events: 450, damages: 1.8 },
+    { year: "2025", events: 490, damages: 2.1 }
+  ]);
+  const [severityDistribution, setSeverityDistribution] = useState<any[]>([
+    { name: "Low", value: 4200, color: "#10B981" },
+    { name: "Moderate", value: 6850, color: "#F59E0B" },
+    { name: "High", value: 4372, color: "#F97316" },
+    { name: "Extreme", value: 1420, color: "#DC2626" }
+  ]);
 
   useEffect(() => {
     setMounted(true);
@@ -64,27 +78,34 @@ export default function AdminDashboard() {
         // Silent catch: Gracefully fall back to pre-populated mock statistics
       }
     };
+
+    const fetchTrends = async () => {
+      try {
+        const token = localStorage.getItem("token") || "";
+        const res = await fetch("http://localhost:8000/api/v1/analytics/trends", {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.length > 0) {
+            const formatted = data.map((item: any) => ({
+              year: item.year.toString(),
+              events: item.eventCount,
+              damages: item.averageDamageUSD / 1000000000 // Convert to Billions USD for chart readability
+            }));
+            setTrendData(formatted);
+          }
+        }
+      } catch (err) {
+        // Silent catch
+      }
+    };
     
     fetchKPIs();
+    fetchTrends();
   }, []);
-
-  // Trend Data for Line Chart
-  const trendData = [
-    { year: "2020", events: 320, damages: 1.1 },
-    { year: "2021", events: 340, damages: 1.3 },
-    { year: "2022", events: 380, damages: 1.6 },
-    { year: "2023", events: 410, damages: 1.4 },
-    { year: "2024", events: 450, damages: 1.8 },
-    { year: "2025", events: 490, damages: 2.1 }
-  ];
-
-  // Severity Distribution Data for Pie Chart
-  const severityDistribution = [
-    { name: "Low", value: 4200, color: "#10B981" },
-    { name: "Moderate", value: 6850, color: "#F59E0B" },
-    { name: "High", value: 4372, color: "#F97316" },
-    { name: "Extreme", value: 1420, color: "#DC2626" }
-  ];
 
   // Live feed log timeline EOC items
   const feedItems = [

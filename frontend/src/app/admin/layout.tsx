@@ -41,10 +41,36 @@ export default function AdminLayout({
 
     if (!token || role !== "admin") {
       router.replace("/login");
-    } else {
-      setAuthorized(true);
-      if (email) setUserEmail(email);
+      return;
     }
+
+    const verifyToken = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/v1/auth/me", {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        if (res.ok) {
+          const user = await res.json();
+          if (user.role === "admin") {
+            setAuthorized(true);
+            if (user.email) setUserEmail(user.email);
+          } else {
+            throw new Error("Forbidden role");
+          }
+        } else {
+          throw new Error("Invalid credentials");
+        }
+      } catch (err) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("role");
+        localStorage.removeItem("email");
+        router.replace("/login");
+      }
+    };
+
+    verifyToken();
   }, [router]);
 
   const navigation = [
