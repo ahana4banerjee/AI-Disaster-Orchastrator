@@ -1,8 +1,11 @@
-from pydantic import BaseModel, Field, constr, model_validator
+from pydantic import BaseModel, Field, constr, model_validator, BeforeValidator
 from typing import Optional, List
+from typing_extensions import Annotated
 from datetime import datetime
 import json
 import os
+
+PyObjectId = Annotated[str, BeforeValidator(str)]
 
 # Load country centroids
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -155,7 +158,7 @@ class DisasterRecordCreate(BaseModel):
         return data
 
 class DisasterRecordResponse(DisasterRecordCreate):
-    id: str = Field(..., alias="_id", description="MongoDB ObjectId hex string")
+    id: PyObjectId = Field(..., alias="_id", description="MongoDB ObjectId hex string")
 
     class Config:
         populate_by_name = True
