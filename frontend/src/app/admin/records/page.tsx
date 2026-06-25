@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, ArrowUpDown, ShieldAlert, CheckCircle } from "lucide-react";
 import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -24,6 +25,7 @@ interface DisasterRecord {
 }
 
 export default function RecordsPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<DisasterRecord[]>([]);
   const [countryFilter, setCountryFilter] = useState("");
@@ -61,6 +63,14 @@ export default function RecordsPage() {
           Authorization: `Bearer ${token}`
         }
       });
+
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("role");
+        localStorage.removeItem("email");
+        router.replace("/login");
+        return;
+      }
 
       if (res.ok) {
         const result = await res.json();
