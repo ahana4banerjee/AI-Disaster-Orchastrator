@@ -129,37 +129,90 @@ We follow a progressive roadmap containing clear exit milestones:
 
 ---
 
-## 🚀 Development Setup Quickstart
+## 🚀 Local Development Setup Quickstart
 
-### Prerequisites
-* Python 3.10+
-* Node.js 18+
-* Docker & Docker Compose
-* MongoDB Atlas connection string (or local MongoDB container)
+Follow these steps to configure and run the application services locally on your machine.
 
-### Step 1: Clone and Configure Environment
-Copy and populate backend environment configurations:
+### 📋 Prerequisites
+* **Python 3.10+** (For core backend and machine learning services)
+* **Node.js 18+** & **npm** (For the React/Next.js frontend portal)
+* **MongoDB Atlas Cluster** (or a local MongoDB database instance)
+* **Docker & Docker Compose** (*Optional; containerization scripts are structured for production deployment and will be fully wired in the future under Phase 8*)
+
+---
+
+### 🛠️ Step-by-Step Installation
+
+#### 1. Fork and Clone the Repository
+Fork the repository on GitHub, then clone your fork locally:
 ```bash
-# app/.env
-MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/disaster_db
-REDIS_URI=redis://localhost:6379/0
-SECRET_KEY=GeneratingASecretKeyStringHereForLocalHashing
-ML_SERVICE_URL=http://localhost:8001
+git clone https://github.com/ahana4banerjee/AI-Disaster-Orchastrator.git
+cd AI-Disaster-Orchastrator
 ```
 
-### Step 2: Data Ingestion Pipeline
-Load the EM-DAT dataset into your MongoDB cluster:
+#### 2. Configure Environment Variables
+Copy the template configuration file in the project root directory to create your `.env` file:
 ```bash
-cd scripts/
+cp .env.example .env
+```
+Open the `.env` file and configure your own keys:
+* Set `MONGO_URI` to your MongoDB Atlas connection string.
+* Set `SECRET_KEY` to a secure, random string (used for JWT encryption).
+
+#### 3. Run the Database Initialization & Seeding Pipeline
+Create your Python virtual environment, install backend dependencies, initialize MongoDB indexes/collections, and ingest the EM-DAT disaster dataset:
+```bash
+# Create Python virtual environment
+python -m venv .venv
+
+# Activate the virtual environment
+# On Windows:
+.venv\Scripts\activate
+# On macOS/Linux:
+source .venv/bin/activate
+
+# Install backend dependencies
+cd backend/
 pip install -r requirements.txt
-python ingest_data.py --csv ../data/raw/public_emdat_custom_request_2026-06-16_b4cec7bb-ec36-4c87-9762-f7cc13e97076.csv
+cd ..
+
+# Initialize MongoDB collections and indexes
+python scripts/db_init.py
+
+# Ingest the historical EM-DAT dataset
+python scripts/ingest_data.py --csv data/raw/public_emdat_custom_request_2026-06-16_b4cec7bb-ec36-4c87-9762-f7cc13e97076.csv
 ```
 
-### Step 3: Run the Services locally via Docker
-Spin up API services, ML serving container, Redis, and frontend dashboards:
+#### 4. Run the Python Backend Services
+Start the Core API Backend and the Machine Learning Inference Service in separate terminal windows (make sure your virtual environment is active in both):
+
+* **FastAPI Core Gateway API (Port 8000)**:
+  ```bash
+  cd backend/
+  python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+  ```
+* **ML Inference Microservice (Port 8001)**:
+  ```bash
+  cd ml_service/
+  python -m uvicorn main:app --reload --host 127.0.0.1 --port 8001
+  ```
+
+#### 5. Run the Frontend Development Server
+Open a new terminal window, navigate to the `frontend/` folder, install npm dependencies, and start the Next.js development server:
 ```bash
-docker-compose up --build
+cd frontend/
+npm install
+npm run dev
 ```
-* **Admin Dashboard UI**: `http://localhost:3000`
-* **FastAPI API Documentation**: `http://localhost:8000/docs`
-* **ML Inference Endpoint**: `http://localhost:8001/docs`
+
+---
+
+### 🔗 Project Port References & API Docs
+* **Next.js Client Dashboard**: [http://localhost:3000](http://localhost:3000) (Default test credentials: `admin_test@earth.org` / `SecurePassword123!`)
+* **FastAPI Gateway Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
+* **FastAPI ML Service Documentation**: [http://localhost:8001/docs](http://localhost:8001/docs)
+
+---
+
+### 🐳 Containerized Production Deployments (Future Phase)
+Docker containerization and production scaling workflows using `docker-compose` will be finalized in **Phase 8 (Deployment & Optimization)**. The current `docker-compose.yml` config serves as a scaffolding representation and is not required for local development runs.
