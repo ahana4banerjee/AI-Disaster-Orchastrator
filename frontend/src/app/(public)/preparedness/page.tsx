@@ -333,28 +333,74 @@ export default function PreparednessAssistant() {
       {/* A4 Print layout stylesheets */}
       <style jsx global>{`
         @media print {
-          body {
-            background: white !important;
-            color: black !important;
-          }
-          .print\\:hidden {
+          /* Hide Navbar, breadcrumbs, checklist configuration card, reset/print buttons */
+          nav,
+          .print\:hidden {
             display: none !important;
           }
-          .print\\:p-0 {
+
+          body, html, #__next, .min-h-screen {
+            background: white !important;
+            color: black !important;
+            height: 100% !important;
+            margin: 0 !important;
             padding: 0 !important;
           }
-          .print\\:border-none {
-            border: none !important;
-            border-bottom: 1px solid #ccc !important;
+
+          /* Force footer to the bottom of the printed page */
+          .min-h-screen {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            min-height: 100vh !important;
           }
-          .print\\:shadow-none {
-            box-shadow: none !important;
+
+          main {
+            flex: 1 0 auto !important;
+            display: flex !important;
+            flex-direction: column !important;
           }
-          .print\\:bg-transparent {
-            background-color: transparent !important;
+
+          .flex-1 {
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: 100% !important;
           }
-          .print\\:col-span-12 {
+
+          /* Force checklist layout to take full grid width during printing */
+          .lg\:col-span-8 {
             grid-column: span 12 / span 12 !important;
+          }
+
+          /* Enforce public footer horizontal layout with 4 columns just like the website */
+          footer {
+            margin-top: auto !important;
+            background: white !important;
+            color: black !important;
+            border-top: 1px solid #ccc !important;
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
+            display: block !important;
+          }
+
+          footer .grid {
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            gap: 2rem !important;
+          }
+
+          footer .grid > div {
+            display: block !important;
+          }
+
+          footer .grid > div p,
+          footer .grid > div ul {
+            display: block !important;
+          }
+
+          footer .grid > div ul li {
+            display: list-item !important;
+            list-style-type: none !important;
           }
         }
       `}</style>
