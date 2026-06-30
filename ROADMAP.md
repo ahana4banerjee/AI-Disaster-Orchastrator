@@ -215,3 +215,20 @@ Each phase contains specific goals, dependencies, deliverables, risks, and crite
 * **Estimated Complexity**: Medium (3-4 days)
 * **Risks**: ML containers can exceed default Docker memory configurations due to heavy model binaries.
 * **Success Criteria**: Entire system boots from a single command (`docker-compose up`); Cached prediction API latencies drop below $5\text{ms}$.
+
+---
+
+## Phase 9: LLM & RAG Safety Ingestion Pipeline
+
+### Goals
+* Integrate Retrieval-Augmented Generation (RAG) and external LLM orchestration layers to dynamically query, extract, and compile hazard safety checklists and regional awareness guides.
+* Transition from deterministic dataset-derived rule templates to dynamic agentic planning modules.
+
+### Deliverables
+* **RAG Pipeline Orchestrator**: Local vector database (e.g., ChromaDB or Milvus) indexing global emergency response manuals, safety handbooks, and FEMA guidelines.
+* **LLM Checklist Agent Route**: `/api/v1/public/preparedness/checklist/rag` leveraging external LLM APIs to dynamically synthesize highly localized checklists.
+
+### Dependencies
+* Complete deployment of Phase 8.
+* Configured LLM API keys (e.g., Gemini, OpenAI) and Vector Store configurations.
+
