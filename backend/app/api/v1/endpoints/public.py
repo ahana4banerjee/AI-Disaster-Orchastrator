@@ -5,6 +5,9 @@ from app.core.database import get_db
 from app.models.schemas.disaster import PaginatedDisasterRecordsResponse, RiskCheckerResponse, ThreatProfile, AwarenessResponse, PreparednessChecklistItem
 
 from app.models.schemas.analytics import SpatialResponse
+from app.api.v1.endpoints.auth import get_current_user
+from app.models.schemas.readiness import ReadinessProfileUpdate, ReadinessProfileResponse
+
 
 router = APIRouter()
 
@@ -687,5 +690,71 @@ async def get_preparedness_checklist(
         return checklist
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Checklist generation error: {str(e)}")
+
+
+STANDARD_READINESS_ITEMS = {
+    "water_3_days", "food_3_days", "first_aid_kit", "flashlight_batteries",
+    "hand_crank_radio", "family_plan", "emergency_contacts", "copies_documents",
+    "cash_reserves", "medical_supplies"
+}
+
+
+@router.get("/readiness", response_model=ReadinessProfileResponse)
+async def get_readiness_profile(
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """
+    Retrieve readiness profile for the logged in user, creating a default one if none exists.
+    """
+    user_id_str = str(current_user["_id"])
+    try:
+        profile = await db.readiness_profiles.find_one({"userId": user_id_str})
+        if not profile:
+            new_profile = {
+                "userId": user_id_str,
+                "checkedItems": [],
+                "score": 0,
+                "updatedAt": datetime.utcnow()
+            }
+            await db.readiness_profiles.insert_one(new_profile)
+            return new_profile
+        return profile
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database retrieval error: {str(e)}")
+
+
+@router.put("/readiness", response_model=ReadinessProfileResponse)
+async def update_readiness_profile(
+    payload: ReadinessProfileUpdate,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """
+    Update checked items and recalculate readiness score for the current user.
+    """
+    user_id_str = str(current_user["_id"])
+    try:
+        # Calculate readiness rating (0-100) based on checked elements matching EOC guidelines
+        checked_set = set(payload.checkedItems)
+        matched_count = len(checked_set.intersection(STANDARD_READINESS_ITEMS))
+        calculated_score = int((matched_count / len(STANDARD_READINESS_ITEMS)) * 100) if STANDARD_READINESS_ITEMS else 0
+        
+        updated_doc = {
+            "checkedItems": payload.checkedItems,
+            "score": calculated_score,
+            "updatedAt": datetime.utcnow()
+        }
+        
+        res = await db.readiness_profiles.find_one_and_update(
+            {"userId": user_id_str},
+            {"$set": updated_doc},
+            upsert=True,
+            return_document=True
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database update error: {str(e)}")
+
 
 

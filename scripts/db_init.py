@@ -51,7 +51,9 @@ def main():
         "resource_plans",
         "ai_reports",
         "analytics_cache",
-        "regional_risk_clusters"
+        "regional_risk_clusters",
+        "readiness_profiles",
+        "disaster_awareness"
     ]
 
     existing_collections = db.list_collection_names()
@@ -123,6 +125,11 @@ def main():
     print("Building indexes on 'regional_risk_clusters'...")
     db.regional_risk_clusters.create_index([("subregion", ASCENDING)], unique=True)
     print("Indexes on 'regional_risk_clusters' initialized.")
+
+    # Collection: readiness_profiles
+    print("Building indexes on 'readiness_profiles'...")
+    db.readiness_profiles.create_index([("userId", ASCENDING)], unique=True, name="userId_unique")
+    print("Indexes on 'readiness_profiles' initialized.")
 
     print("\nMongoDB Database Schema Initialization Completed Successfully.")
 
