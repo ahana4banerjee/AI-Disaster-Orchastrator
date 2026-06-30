@@ -41,7 +41,7 @@ export default function RegisterPage() {
 
       setToast({ message: "Registration successful! Profile registered in EOC directory.", type: "success" });
       setTimeout(() => {
-        router.push("/login");
+        window.location.href = "/login";
       }, 1000);
     } catch (err: any) {
       let msg = err.message || "An unexpected error occurred.";

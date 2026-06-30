@@ -46,12 +46,12 @@ export default function LoginPage() {
       if (data.role === "admin") {
         setToast({ message: "Establish secure connection: Authorized Admin session verified.", type: "success" });
         setTimeout(() => {
-          router.push("/admin/dashboard");
+          window.location.href = "/admin/dashboard";
         }, 1000);
       } else if (data.role === "public_user") {
         setToast({ message: "Sign in successful: Citizen portal session verified.", type: "success" });
         setTimeout(() => {
-          router.push("/");
+          window.location.href = "/";
         }, 1000);
       } else {
         throw new Error("Access restricted: Invalid account role.");

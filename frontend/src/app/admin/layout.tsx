@@ -93,7 +93,7 @@ export default function AdminLayout({
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     localStorage.removeItem("email");
-    router.replace("/login");
+    window.location.href = "/login";
   };
 
   if (!authorized) {
