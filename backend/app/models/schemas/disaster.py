@@ -200,4 +200,10 @@ class AwarenessResponse(BaseModel):
     resources: List[str] = []
 
 
+class PreparednessChecklistItem(BaseModel):
+    item: str
+    category: str
+    priority: str
+
+
 

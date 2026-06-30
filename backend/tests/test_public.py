@@ -162,5 +162,30 @@ class TestPublicAPI(unittest.TestCase):
         response = self.client.get("/api/v1/public/awareness/unknown_hazard")
         self.assertEqual(response.status_code, 404)
 
+    def test_get_preparedness_checklist_success(self):
+        self.mock_db.disaster_awareness.find_one = AsyncMock(return_value={
+            "hazard": "flood",
+            "description": "desc",
+            "warningSigns": [],
+            "before": ["action"],
+            "during": ["during"],
+            "after": [],
+            "resources": []
+        })
+        self.mock_db.disaster_records.count_documents = AsyncMock(return_value=10)
+
+        response = self.client.get("/api/v1/public/preparedness/checklist?country=Kenya&disasterType=Flood")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(len(data) >= 7) # 6 essentials + hazard actions + country info
+        self.assertEqual(data[0]["category"], "Supplies")
+        self.assertEqual(data[-1]["category"], "Regional Info")
+        self.assertEqual(data[-1]["priority"], "Critical")
+
+    def test_get_preparedness_checklist_missing_params(self):
+        response = self.client.get("/api/v1/public/preparedness/checklist?country=Kenya")
+        self.assertEqual(response.status_code, 422)
+
+
 
 

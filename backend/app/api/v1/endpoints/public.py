@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
 from datetime import datetime
 from app.core.database import get_db
-from app.models.schemas.disaster import PaginatedDisasterRecordsResponse, RiskCheckerResponse, ThreatProfile, AwarenessResponse
+from app.models.schemas.disaster import PaginatedDisasterRecordsResponse, RiskCheckerResponse, ThreatProfile, AwarenessResponse, PreparednessChecklistItem
 
 from app.models.schemas.analytics import SpatialResponse
 
@@ -530,6 +530,96 @@ async def get_awareness_guide_by_hazard(hazard: str, db = Depends(get_db)):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+
+@router.get("/preparedness/checklist", response_model=List[PreparednessChecklistItem])
+async def get_preparedness_checklist(
+    country: str = Query(..., description="Target country"),
+    disasterType: str = Query(..., description="Hazard type category"),
+    db = Depends(get_db)
+):
+    """
+    Generate custom, checkable preparedness checklists based on country and disaster type.
+    """
+    if not country.strip() or not disasterType.strip():
+        raise HTTPException(status_code=400, detail="Country and disasterType parameters cannot be empty")
+
+    try:
+        # 1. Compile the live dataset awareness profile for the hazard
+        profile = await get_dynamic_awareness_profile(disasterType, db)
+        
+        checklist = []
+        
+        # 2. Add Universal Essentials (Critical priority)
+        checklist.append({
+            "item": "Pack a 3-day supply of water (1 gallon per person per day for drinking and sanitation)",
+            "category": "Supplies",
+            "priority": "Critical"
+        })
+        checklist.append({
+            "item": "Pack a 3-day supply of non-perishable, ready-to-eat food items",
+            "category": "Supplies",
+            "priority": "Critical"
+        })
+        checklist.append({
+            "item": "Pack a complete first aid kit and any necessary prescription family medications",
+            "category": "Supplies",
+            "priority": "Critical"
+        })
+        checklist.append({
+            "item": "Pack emergency flashlights, a hand-crank radio, and extra batteries",
+            "category": "Supplies",
+            "priority": "Critical"
+        })
+        checklist.append({
+            "item": "Pack backup battery power banks and device charging cables",
+            "category": "Supplies",
+            "priority": "Critical"
+        })
+        checklist.append({
+            "item": "Secure copies of crucial documents (ID cards, insurance deeds, medical logs) in water-resistant sleeves",
+            "category": "Documents",
+            "priority": "Critical"
+        })
+
+        # 3. Add Hazard-Specific Actions from the EOC awareness guide
+        for act in profile.get("before", [])[:4]:
+            checklist.append({
+                "item": act,
+                "category": "Action Item",
+                "priority": "Recommended"
+            })
+            
+        for act in profile.get("during", [])[:2]:
+            checklist.append({
+                "item": act,
+                "category": "Survival Action",
+                "priority": "Critical"
+            })
+
+        # 4. Query country-specific historical records to compile localized risk items
+        c_query = {
+            "country": {"$regex": f"^{country.strip()}$", "$options": "i"},
+            "disasterType": {"$regex": f"^{disasterType.strip()}$", "$options": "i"}
+        }
+        c_count = await db.disaster_records.count_documents(c_query)
+        if c_count > 5:
+            checklist.append({
+                "item": f"High Risk Alert: {country.strip()} has registered {c_count} historical {disasterType.strip()} disasters in the EOC dataset. Ensure household communication lines are clear.",
+                "category": "Regional Info",
+                "priority": "Critical"
+            })
+        elif c_count > 0:
+            checklist.append({
+                "item": f"Regional Precaution: {country.strip()} has documented history of {disasterType.strip()} events in the EOC dataset.",
+                "category": "Regional Info",
+                "priority": "Recommended"
+            })
+            
+        return checklist
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Checklist generation error: {str(e)}")
+
 
 
 
