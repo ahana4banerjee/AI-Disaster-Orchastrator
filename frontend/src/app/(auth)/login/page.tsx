@@ -43,14 +43,19 @@ export default function LoginPage() {
       localStorage.setItem("role", data.role);
       localStorage.setItem("email", email);
 
-      if (data.role !== "admin") {
-        throw new Error("Access restricted: Authorized administrators only.");
+      if (data.role === "admin") {
+        setToast({ message: "Establish secure connection: Authorized Admin session verified.", type: "success" });
+        setTimeout(() => {
+          router.push("/admin/dashboard");
+        }, 1000);
+      } else if (data.role === "public_user") {
+        setToast({ message: "Sign in successful: Citizen portal session verified.", type: "success" });
+        setTimeout(() => {
+          router.push("/");
+        }, 1000);
+      } else {
+        throw new Error("Access restricted: Invalid account role.");
       }
-
-      setToast({ message: "Establish secure connection: Authorized Admin session verified.", type: "success" });
-      setTimeout(() => {
-        router.push("/admin/dashboard");
-      }, 1000);
     } catch (err: any) {
       let msg = err.message || "An unexpected error occurred.";
       if (msg === "Failed to fetch") {
