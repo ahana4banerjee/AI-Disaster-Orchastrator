@@ -205,6 +205,51 @@ class TestPublicAPI(unittest.TestCase):
         response = self.client.get("/api/v1/public/preparedness/checklist?country=Kenya")
         self.assertEqual(response.status_code, 422)
 
+    def test_chat_fallback_success(self):
+        payload = {"message": "hello chatbot"}
+        response = self.client.post("/api/v1/public/ai-assistant/chat", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("EOC Disaster Intel Assistant", data["reply"])
+        self.assertIn("/preparedness", data["context"])
+
+    def test_chat_hazard_success(self):
+        # Mock awareness query for flood
+        self.mock_db.disaster_awareness.find_one = AsyncMock(return_value={
+            "hazard": "flood",
+            "description": "Rising waters",
+            "warningSigns": ["rain"],
+            "before": ["kit"],
+            "during": ["evacuate"],
+            "after": ["boil"],
+            "resources": []
+        })
+        self.mock_db.disaster_awareness.count_documents = AsyncMock(return_value=1)
+
+        payload = {"message": "what is flood safety checklist"}
+        response = self.client.post("/api/v1/public/ai-assistant/chat", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("EOC OFFICIAL BULLETIN: FLOOD SAFETY PROTOCOLS", data["reply"])
+        self.assertIn("/awareness/flood", data["context"])
+
+    def test_chat_readiness_success(self):
+        payload = {"message": "tell me about my readiness score"}
+        response = self.client.post("/api/v1/public/ai-assistant/chat", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("10-Step EOC Readiness Quiz", data["reply"])
+        self.assertIn("/readiness", data["context"])
+
+    def test_chat_family_success(self):
+        payload = {"message": "how to build a family plan?"}
+        response = self.client.post("/api/v1/public/ai-assistant/chat", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("Family Emergency Plan", data["reply"])
+        self.assertIn("/family-planner", data["context"])
+
+
 
 
 

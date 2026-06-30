@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
 from datetime import datetime
 from app.core.database import get_db
-from app.models.schemas.disaster import PaginatedDisasterRecordsResponse, RiskCheckerResponse, ThreatProfile, AwarenessResponse, PreparednessChecklistItem
+from app.models.schemas.disaster import PaginatedDisasterRecordsResponse, RiskCheckerResponse, ThreatProfile, AwarenessResponse, PreparednessChecklistItem, ChatMessage, ChatResponse
 
 from app.models.schemas.analytics import SpatialResponse
 from app.api.v1.endpoints.auth import get_current_user
@@ -813,6 +813,92 @@ async def create_or_update_family_plan(
         return response_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database update error: {str(e)}")
+
+
+@router.post("/ai-assistant/chat", response_model=ChatResponse)
+async def ai_assistant_chat(
+    payload: ChatMessage,
+    db = Depends(get_db)
+):
+    """
+    Public AI Assistant Chatbot gateway (non-authenticated access).
+    Uses keyword-driven heuristic intelligence mapping over seeded hazard collections.
+    """
+    msg = payload.message.lower().strip()
+    
+    # Supported EOC hazards list
+    hazards = ["flood", "earthquake", "storm", "wildfire", "drought", "landslide", "volcano"]
+    
+    # 1. Check for hazard match
+    matched_hazard = None
+    for h in hazards:
+        if h in msg:
+            matched_hazard = h
+            break
+            
+    if matched_hazard:
+        try:
+            profile = await get_dynamic_awareness_profile(matched_hazard, db)
+            
+            # Format custom EOC Bulletin text reply
+            bullets_before = "\n• " + "\n• ".join(profile["before"][:3]) if profile["before"] else ""
+            bullets_during = "\n• " + "\n• ".join(profile["during"][:3]) if profile["during"] else ""
+            bullets_after = "\n• " + "\n• ".join(profile["after"][:3]) if profile["after"] else ""
+            
+            reply_text = (
+                f"### EOC OFFICIAL BULLETIN: {matched_hazard.upper()} SAFETY PROTOCOLS\n\n"
+                f"**Description**: {profile['description']}\n\n"
+                f"**Warning Signs**:\n"
+                f"• " + "\n• ".join(profile["warningSigns"]) + "\n\n"
+                f"**Action Checklist**:\n"
+                f"**1. Before Event**:{bullets_before}\n\n"
+                f"**2. During Event**:{bullets_during}\n\n"
+                f"**3. After Event**:{bullets_after}"
+            )
+            
+            context_links = [f"/awareness/{matched_hazard}", "/preparedness"]
+            return {"reply": reply_text, "context": context_links}
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Assistant lookup failed: {str(e)}")
+            
+    # 2. Check for readiness/quiz match
+    if any(k in msg for k in ["ready", "readiness", "quiz", "score"]):
+        reply_text = (
+            "### PERSONAL PREPAREDNESS AUDIT\n\n"
+            "Ready to audit your household's emergency preparedness score? Take our **10-Step EOC Readiness Quiz**!\n\n"
+            "By logging your supplies (3-day water, food, first aid kits) and communications plans, "
+            "you can calculate a dynamic diagnostic score from **0 to 100%** and access printable custom packing lists.\n\n"
+            "Click the links below to start your diagnostic audit."
+        )
+        return {"reply": reply_text, "context": ["/readiness", "/preparedness"]}
+
+    # 3. Check for family plan matching
+    if any(k in msg for k in ["family", "plan", "planner", "member", "contact"]):
+        reply_text = (
+            "### FAMILY EMERGENCY PLANNING DIRECTIVE\n\n"
+            "EOC recommends establishing a structured, printable **Family Emergency Plan** for your household.\n\n"
+            "Use the planner dashboard to document:\n"
+            "• Household member counts & medical rules\n"
+            "• Emergency contact directories\n"
+            "• Primary/secondary evacuation routes & assembly zones\n\n"
+            "Once saved, the assistant automatically compiles a pocket-sized card printout with signature lines."
+        )
+        return {"reply": reply_text, "context": ["/family-planner"]}
+
+    # 4. Default fallback reply
+    reply_text = (
+        "Hello! I am your **EOC Disaster Intel Assistant**.\n\n"
+        "I can compile emergency checklists, review evacuation routes, or query historical EM-DAT safety matrices.\n\n"
+        "To get targeted disaster safety guidance, please ask me about specific hazards, for example:\n"
+        "• *'how to prepare for a flood?'*\n"
+        "• *'earthquake safety warning signs'*\n"
+        "• *'view storm action list'*\n"
+        "• *'family emergency plan instructions'*\n\n"
+        "Alternatively, navigate to our Preparedness Assistant or view detailed analytics in the Regional Insights panel."
+    )
+    return {"reply": reply_text, "context": ["/preparedness", "/awareness", "/insights"]}
+
 
 
 

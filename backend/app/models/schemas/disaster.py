@@ -206,4 +206,14 @@ class PreparednessChecklistItem(BaseModel):
     priority: str
 
 
+class ChatMessage(BaseModel):
+    message: str = Field(..., description="The query message entered by the user")
+
+
+class ChatResponse(BaseModel):
+    reply: str = Field(..., description="Response reply text from the EOC assistant chatbot")
+    context: List[str] = Field(default=[], description="Supplementary context links or hazard sources referenced")
+
+
+
 
