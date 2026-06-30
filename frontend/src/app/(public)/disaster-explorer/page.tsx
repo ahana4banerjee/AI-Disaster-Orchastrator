@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   ChevronLeft,
   ChevronRight,
-  ShieldAlert,
   Database,
   ArrowLeft,
   Calendar,
@@ -24,6 +24,19 @@ import { Card } from "@/components/ui/Card";
 import { TableSkeleton } from "@/components/ui/Skeleton";
 import { SeverityBadge } from "@/components/ui/SeverityBadge";
 import { Timeline, TimelineItem } from "@/components/ui/Timeline";
+
+// Dynamically load the Leaflet GIS Map with SSR disabled to prevent compilation crashes on window references
+const NearbyMap = dynamic(
+  () => import("@/components/ui/NearbyMap"),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="h-[280px] w-full bg-bg-primary rounded-lg flex items-center justify-center border border-border-custom border-dashed text-xs font-mono uppercase tracking-wider text-text-muted animate-pulse">
+        Initializing GIS Map engine...
+      </div>
+    )
+  }
+);
 
 interface DisasterRecord {
   _id?: string;
@@ -63,8 +76,8 @@ export default function PublicDisasterExplorer() {
   const [totalCount, setTotalCount] = useState(0);
 
   // --- TAB 2: GEOSPATIAL NEARBY SEARCH STATE ---
-  const [longitude, setLongitude] = useState<number>(39.6);
-  const [latitude, setLatitude] = useState<number>(-4.0);
+  const [longitude, setLongitude] = useState<number>(39.66);
+  const [latitude, setLatitude] = useState<number>(-4.04);
   const [radiusKm, setRadiusKm] = useState<number>(500);
   const [limitNearby, setLimitNearby] = useState<number>(10);
   const [nearbyRecords, setNearbyRecords] = useState<NearbyRecord[]>([]);
@@ -140,7 +153,6 @@ export default function PublicDisasterExplorer() {
     } catch (err) {
       // Simulated nearby disaster lookup fallback (calculates mathematical distance based on coordinates)
       const simulated: NearbyRecord[] = fallbackRecords.map((r, i) => {
-        // Rough coordinate simulation for default fallbacks
         const coords = [
           [44.0, 31.0], // Iraq
           [14.0, 36.0], // Malta
@@ -184,23 +196,6 @@ export default function PublicDisasterExplorer() {
       fetchGeospatialRecords();
     }
   }, [activeTab, page, countryFilter, typeFilter, yearFilter, longitude, latitude, radiusKm, limitNearby]);
-
-  // Click on SVG Map Picker
-  const handleMapClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const pctX = x / rect.width;
-    const pctY = y / rect.height;
-    
-    // Map X to Longitude (-180 to 180)
-    const lon = Math.round((pctX * 360 - 180) * 10) / 10;
-    // Map Y to Latitude (-90 to 90)
-    const lat = Math.round((90 - pctY * 180) * 10) / 10;
-    
-    setLongitude(lon);
-    setLatitude(lat);
-  };
 
   // Convert Nearby records into Timeline format
   const timelineItems: TimelineItem[] = nearbyRecords.map((r) => ({
@@ -481,57 +476,29 @@ export default function PublicDisasterExplorer() {
       {activeTab === "geospatial" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fadeIn">
           
-          {/* Interactive SVG Locator Map Picker & Coordinate inputs */}
+          {/* Interactive Leaflet Map Picker & Coordinate inputs */}
           <div className="lg:col-span-5 space-y-6">
             <Card className="p-6 space-y-6 bg-bg-secondary border border-border-custom">
-              <div className="flex items-center gap-2 border-b border-border-custom pb-3">
-                <MapPin className="h-4 w-4 text-accent-primary animate-bounce" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">
-                  Interactive Vector Locator Picker
-                </h3>
+              <div className="flex items-center justify-between border-b border-border-custom pb-3">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-accent-primary animate-bounce" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">
+                    Interactive Geospatial GIS Map
+                  </h3>
+                </div>
               </div>
 
-              {/* Pure SVG Coordinate Plot Map Widget */}
-              <div className="relative border border-border-custom rounded-lg overflow-hidden bg-bg-primary h-[260px] select-none">
-                <svg
-                  className="w-full h-full cursor-crosshair"
-                  onClick={handleMapClick}
-                >
-                  {/* Grid Lines */}
-                  {/* Equator */}
-                  <line x1="0" y1="50%" x2="100%" y2="50%" stroke="var(--color-border-custom)" strokeDasharray="4 4" strokeWidth="1" />
-                  {/* Prime Meridian */}
-                  <line x1="50%" y1="0" x2="50%" y2="100%" stroke="var(--color-border-custom)" strokeDasharray="4 4" strokeWidth="1" />
-
-                  {/* Continent Shapes Mockup (Lightweight visual vectors) */}
-                  <path
-                    d="M 50 80 Q 80 50 120 70 T 200 60 Q 240 100 280 120 T 320 180 Q 260 220 220 200 T 150 240 Z"
-                    fill="currentColor"
-                    className="text-text-muted/5"
-                  />
-                  <path
-                    d="M 380 90 Q 420 60 480 80 T 520 110 T 580 160 Q 520 210 460 200 Z"
-                    fill="currentColor"
-                    className="text-text-muted/5"
-                  />
-
-                  {/* Locator Coordinate Target Pointer Indicator */}
-                  {(() => {
-                    // Map lat/lon back to percentages
-                    const pctX = (longitude + 180) / 360;
-                    const pctY = (90 - latitude) / 180;
-                    return (
-                      <g className="transition-all duration-300">
-                        {/* Target Crosshair */}
-                        <circle cx={`${pctX * 100}%`} cy={`${pctY * 100}%`} r="12" fill="none" stroke="var(--color-accent-primary)" strokeWidth="1.5" className="animate-pulse" />
-                        <circle cx={`${pctX * 100}%`} cy={`${pctY * 100}%`} r="3" fill="var(--color-accent-primary)" />
-                      </g>
-                    );
-                  })()}
-                </svg>
-                <div className="absolute bottom-2 left-2 bg-bg-secondary/90 border border-border-custom px-2 py-1 rounded text-[9px] font-bold text-text-secondary uppercase tracking-wider font-mono">
-                  Click map to set coordinate
-                </div>
+              {/* Leaflet Dynamic OpenStreetMap Container */}
+              <div className="relative border border-border-custom rounded-lg overflow-hidden bg-bg-primary h-[280px] shadow-inner z-10">
+                <NearbyMap
+                  latitude={latitude}
+                  longitude={longitude}
+                  radiusKm={radiusKm}
+                  onCoordinatesChange={(lat, lon) => {
+                    setLatitude(lat);
+                    setLongitude(lon);
+                  }}
+                />
               </div>
 
               {/* Text Input Coordinate Adjusters */}
@@ -541,7 +508,10 @@ export default function PublicDisasterExplorer() {
                   type="number"
                   step="0.01"
                   value={longitude}
-                  onChange={(e) => setLongitude(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (val >= -180 && val <= 180) setLongitude(val);
+                  }}
                   id="longitude-input"
                 />
                 <Input
@@ -549,7 +519,10 @@ export default function PublicDisasterExplorer() {
                   type="number"
                   step="0.01"
                   value={latitude}
-                  onChange={(e) => setLatitude(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (val >= -90 && val <= 90) setLatitude(val);
+                  }}
                   id="latitude-input"
                 />
               </div>
@@ -564,9 +537,9 @@ export default function PublicDisasterExplorer() {
                   <input
                     id="radius-slider"
                     type="range"
-                    min="10"
+                    min="50"
                     max="2000"
-                    step="10"
+                    step="50"
                     value={radiusKm}
                     onChange={(e) => setRadiusKm(parseInt(e.target.value) || 500)}
                     className="w-full h-1.5 bg-bg-primary rounded-lg appearance-none cursor-pointer accent-accent-primary"
