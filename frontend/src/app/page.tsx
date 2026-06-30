@@ -1,10 +1,59 @@
-import React from "react";
-import Link from "next/link";
-import { Shield, AlertCircle, FileText, ChevronRight, Activity, Globe } from "lucide-react";
+"use client";
 
-export default function Home() {
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Shield, AlertCircle, ChevronRight, Activity, Globe } from "lucide-react";
+import PublicHomePage from "./(public)/page";
+import { PublicNavbar } from "@/components/ui/PublicNavbar";
+import { PublicFooter } from "@/components/ui/PublicFooter";
+
+export default function RootHomePage() {
+  const router = useRouter();
+  const [role, setRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const storedRole = localStorage.getItem("role");
+    const token = localStorage.getItem("token");
+    if (token && storedRole) {
+      setRole(storedRole);
+      if (storedRole === "admin") {
+        router.replace("/admin/dashboard");
+        return;
+      }
+    } else {
+      // Clear roles if no token exists to be safe
+      setRole(null);
+    }
+    setLoading(false);
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center font-sans">
+        <div className="text-xs font-mono text-text-secondary uppercase">
+          Initializing telemetry link...
+        </div>
+      </div>
+    );
+  }
+
+  if (role === "public_user") {
+    return (
+      <div className="min-h-screen flex flex-col bg-bg-primary text-text-primary transition-colors duration-150 font-sans">
+        <PublicNavbar />
+        <main className="flex-1 flex flex-col w-full">
+          <PublicHomePage />
+        </main>
+        <PublicFooter />
+      </div>
+    );
+  }
+
+  // Otherwise, render the EOC welcome gate page
   return (
-    <div className="min-h-screen bg-bg-primary text-text-primary flex flex-col justify-between font-sans">
+    <div className="min-h-screen bg-bg-primary text-text-primary flex flex-col justify-between font-sans transition-colors duration-150">
       {/* Header Navigation */}
       <header className="h-20 border-b border-border-custom bg-bg-secondary px-8 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-3">
