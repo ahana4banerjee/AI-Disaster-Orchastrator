@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
 from datetime import datetime
 from app.core.database import get_db
-from app.models.schemas.disaster import PaginatedDisasterRecordsResponse, RiskCheckerResponse, ThreatProfile
+from app.models.schemas.disaster import PaginatedDisasterRecordsResponse, RiskCheckerResponse, ThreatProfile, AwarenessResponse
 
 from app.models.schemas.analytics import SpatialResponse
 
@@ -209,5 +209,247 @@ async def get_public_risk_checker(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database aggregation query error: {str(e)}")
+
+
+DEFAULT_AWARENESS_TEMPLATES = [
+    {
+        "hazard": "flood",
+        "description": "Rapid accumulation of water in normally dry landmass areas, triggered by intense rainfall, storms, or dam failures.",
+        "warningSigns": [
+            "Rapidly rising water levels in local waterways",
+            "Heavy rainfall persisting over multiple hours",
+            "Saturated ground conditions with localized pooling"
+        ],
+        "before": [
+            "Build an emergency kit containing non-perishable foods and water supplies",
+            "Identify elevated evacuation routes and local emergency shelters",
+            "Secure household appliances and document physical assets"
+        ],
+        "during": [
+            "Evacuate immediately if directed by regional emergency services",
+            "Avoid walking or driving through moving water currents",
+            "Move to higher levels or attic crawlspaces if trapped inside structures"
+        ],
+        "after": [
+            "Boil all drinking water until local sanitation declares lines safe",
+            "Avoid electrical devices contact if exposed to standing water",
+            "Document structural damages for restoration claims"
+        ],
+        "resources": [
+            "FEMA Flood Safety Guide",
+            "Red Cross Emergency Kit Preparation Guide"
+        ]
+    },
+    {
+        "hazard": "earthquake",
+        "description": "Sudden release of geological energy along fault lines, producing strong ground shaking and structural shifts.",
+        "warningSigns": [
+            "Minor structural rattling or deep rumbling sounds",
+            "Erratic animal behaviors or sudden pet alarms",
+            "Initial minor tremors preceding large seismic shifts"
+        ],
+        "before": [
+            "Anchor heavy furniture, mirrors, and shelving to wall studs",
+            "Establish a family reunion protocol and designate assembly points",
+            "Locate utility shutoff valves (gas, electricity, water)"
+        ],
+        "during": [
+            "Execute drop, cover, and hold under sturdy furniture",
+            "Stay indoors away from exterior windows, glass, or heavy cabinets",
+            "Pull over safely to the side of the road if operating vehicles"
+        ],
+        "after": [
+            "Check structural walls for cracks and sniff for gas leaks",
+            "Expect subsequent aftershocks and keep shoes on to avoid debris",
+            "Monitor local EOC broadcasts for structural safety updates"
+        ],
+        "resources": [
+            "USGS Earthquake Hazards Portal",
+            "Red Cross Earthquake Readiness Checklist"
+        ]
+    },
+    {
+        "hazard": "storm",
+        "description": "Violent atmospheric disturbances characterized by high-velocity winds, lightning, hail, and heavy rainfall.",
+        "warningSigns": [
+            "Sudden drop in barometric pressure and dark wall clouds",
+            "Violent wind gust increases and atmospheric cooling",
+            "Severe thunder and continuous lighting strikes"
+        ],
+        "before": [
+            "Trim weak tree branches hanging over structural roofs",
+            "Board up glass windows and secure all loose outdoor items",
+            "Charge battery backup devices and keep flashlights nearby"
+        ],
+        "during": [
+            "Seek shelter inside a central interior room away from windows",
+            "Unplug sensitive electrical devices to prevent surge damage",
+            "Avoid showering or using landline phones during lightning storms"
+        ],
+        "after": [
+            "Report downed utility lines to local power grids",
+            "Inspect property roofs for damage and avoid flooded streets",
+            "Check on elderly neighbors and clear small yard blockages"
+        ],
+        "resources": [
+            "National Weather Service Storm Preparedness",
+            "EOC Windstorm Safety Toolkit"
+        ]
+    },
+    {
+        "hazard": "wildfire",
+        "description": "Uncontrolled fires spreading rapidly across dry forest, brush, or woodland areas, threatening lives and properties.",
+        "warningSigns": [
+            "Plumes of dark smoke rising along the horizon",
+            "Smell of burning timber and falling ash",
+            "Sudden increases in local wind speeds and temperatures"
+        ],
+        "before": [
+            "Clear dry leaves, twigs, and vegetation within 30 feet of structures",
+            "Designate a safe evacuation destination outside fire zones",
+            "Keep vehicle fuel tanks full and pack emergency bags"
+        ],
+        "during": [
+            "Evacuate immediately upon receiving alert orders",
+            "Keep all windows, doors, and vents closed if remaining indoors",
+            "Wear face coverings or wet cloths to filter ash and smoke inhalation"
+        ],
+        "after": [
+            "Inspect roof, attic, and crawlspaces for hidden hot spots",
+            "Avoid hot ash, charred trees, and active utility lines",
+            "Wait for EOC all-clear notices before returning to properties"
+        ],
+        "resources": [
+            "Ready.gov Wildfire Safety Guide",
+            "State Forestry Fire Prevention Bureau"
+        ]
+    },
+    {
+        "hazard": "drought",
+        "description": "Extended periods of deficient rainfall resulting in water scarcity, crop damage, and ecological imbalances.",
+        "warningSigns": [
+            "Decreasing water levels in reservoirs and wells",
+            "Widespread wilting of crops and dry soil cracks",
+            "Local water utility restrictions on non-essential consumption"
+        ],
+        "before": [
+            "Install water-efficient fixtures and low-flow aerators",
+            "Repair structural plumbing leaks and insulate water pipes",
+            "Establish rainwater harvesting systems for landscape irrigation"
+        ],
+        "during": [
+            "Adhere strictly to local utility water rationing mandates",
+            "Re-use greywater for plants and household flushing",
+            "Prioritize water supplies for hydration and hygiene needs"
+        ],
+        "after": [
+            "Evaluate long-term agricultural soil restoration strategies",
+            "Maintain water conservation habits post-drought recovery",
+            "Participate in local water resource planning forums"
+        ],
+        "resources": [
+            "National Drought Mitigation Center",
+            "EPA Water Conservation Guidelines"
+        ]
+    },
+    {
+        "hazard": "landslide",
+        "description": "Downward movement of soil, rocks, and debris along slopes, triggered by heavy rain, seismic activity, or human construction.",
+        "warningSigns": [
+            "New cracks in plaster, tile, brick, or foundations",
+            "Tilted trees, utility poles, or retaining walls",
+            "Faint rumbling sounds that increase in volume over time"
+        ],
+        "before": [
+            "Avoid building structures on steep slopes or near ravine edges",
+            "Plant ground cover on slopes to stabilize soil structures",
+            "Review evacuation paths away from potential debris flows"
+        ],
+        "during": [
+            "Evacuate immediately if you suspect a debris flow is imminent",
+            "Curl into a tight ball and protect your head if escape is impossible",
+            "Listen for unusual cracking sounds indicating moving earth"
+        ],
+        "after": [
+            "Stay away from the slide area to prevent secondary slide traps",
+            "Check for damaged utility lines and report them to authorities",
+            "Consult geotechnical specialists to evaluate slope stability"
+        ],
+        "resources": [
+            "USGS Landslides Hazards Program",
+            "Red Cross Landslide Preparedness Guide"
+        ]
+    },
+    {
+        "hazard": "volcano",
+        "description": "Release of molten rock, ash, and gases from underground chambers, producing lava flows, ash fall, and toxic gas clouds.",
+        "warningSigns": [
+            "Increased seismic shaking or minor tremors near vents",
+            "Ground deformation or bulging of the volcano slope",
+            "Changes in gas emissions or visible steam plumes"
+        ],
+        "before": [
+            "Establish evacuation routes outside defined exclusion zones",
+            "Keep goggles and N95 masks in emergency supply kits",
+            "Review safety plans for ash fall protection and shelter-in-place"
+        ],
+        "during": [
+            "Follow evacuation orders from local authorities immediately",
+            "Wear long sleeves, pants, and eye protection if caught in ash fall",
+            "Stay indoors with all windows and ventilation systems closed"
+        ],
+        "after": [
+            "Clear heavy ash accumulation from roofs to prevent collapse",
+            "Avoid driving through thick ash clouds to protect engine filters",
+            "Listen to emergency EOC broadcasts for air quality warnings"
+        ],
+        "resources": [
+            "USGS Volcano Hazards Program",
+            "FEMA Volcanic Ash Safety Portal"
+        ]
+    }
+]
+
+
+async def seed_disaster_awareness(db):
+    """
+    Check and seed the disaster_awareness collection with guides.
+    """
+    count = await db.disaster_awareness.count_documents({})
+    if count == 0:
+        await db.disaster_awareness.insert_many(DEFAULT_AWARENESS_TEMPLATES)
+
+
+@router.get("/awareness", response_model=List[AwarenessResponse])
+async def get_all_awareness_guides(db = Depends(get_db)):
+    """
+    Retrieve all disaster safety awareness guides.
+    """
+    try:
+        await seed_disaster_awareness(db)
+        cursor = db.disaster_awareness.find({})
+        results = await cursor.to_list(length=100)
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+
+@router.get("/awareness/{hazard}", response_model=AwarenessResponse)
+async def get_awareness_guide_by_hazard(hazard: str, db = Depends(get_db)):
+    """
+    Retrieve disaster safety guide for a specific hazard category.
+    """
+    try:
+        await seed_disaster_awareness(db)
+        norm = hazard.lower().strip()
+        doc = await db.disaster_awareness.find_one({"hazard": norm})
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Awareness guide for hazard category '{hazard}' not found")
+        return doc
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
 
 

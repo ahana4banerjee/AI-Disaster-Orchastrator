@@ -132,4 +132,35 @@ class TestPublicAPI(unittest.TestCase):
         response = self.client.get("/api/v1/public/risk-checker")
         self.assertEqual(response.status_code, 422) # Missing parameter query
 
+    def test_get_public_awareness_all_success(self):
+        mock_cursor = MagicMock()
+        mock_guides = [
+            {
+                "hazard": "flood",
+                "description": "Flood description",
+                "warningSigns": ["rises"],
+                "before": ["prep"],
+                "during": ["evac"],
+                "after": ["clean"],
+                "resources": []
+            }
+        ]
+        mock_cursor.to_list = AsyncMock(return_value=mock_guides)
+        self.mock_db.disaster_awareness.find.return_value = mock_cursor
+        self.mock_db.disaster_awareness.count_documents = AsyncMock(return_value=1)
+
+        response = self.client.get("/api/v1/public/awareness")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(len(data) >= 1)
+        self.assertEqual(data[0]["hazard"], "flood")
+
+    def test_get_public_awareness_by_hazard_not_found(self):
+        self.mock_db.disaster_awareness.find_one = AsyncMock(return_value=None)
+        self.mock_db.disaster_awareness.count_documents = AsyncMock(return_value=1)
+
+        response = self.client.get("/api/v1/public/awareness/unknown_hazard")
+        self.assertEqual(response.status_code, 404)
+
+
 

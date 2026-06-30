@@ -190,3 +190,14 @@ class RiskCheckerResponse(BaseModel):
     topThreats: List[ThreatProfile]
 
 
+class AwarenessResponse(BaseModel):
+    hazard: str
+    description: str
+    warningSigns: List[str]
+    before: List[str]
+    during: List[str]
+    after: List[str]
+    resources: List[str] = []
+
+
+
