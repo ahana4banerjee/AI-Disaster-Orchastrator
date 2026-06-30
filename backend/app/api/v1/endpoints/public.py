@@ -4,6 +4,8 @@ from datetime import datetime
 from app.core.database import get_db
 from app.models.schemas.disaster import PaginatedDisasterRecordsResponse
 
+from app.models.schemas.analytics import SpatialResponse
+
 router = APIRouter()
 
 @router.get("/disasters", response_model=PaginatedDisasterRecordsResponse)
@@ -48,3 +50,60 @@ async def get_public_disasters(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+
+@router.get("/disasters/nearby", response_model=List[SpatialResponse])
+async def get_public_nearby_disasters(
+    longitude: float = Query(..., description="Query point longitude", ge=-180.0, le=180.0),
+    latitude: float = Query(..., description="Query point latitude", ge=-90.0, le=90.0),
+    radiusKm: float = Query(default=500.0, description="Search radius in kilometers", ge=1.0, le=2000.0),
+    limit: int = Query(default=10, description="Maximum matching records to return", ge=1, le=50),
+    db = Depends(get_db)
+):
+    """
+    Geospatial nearby disaster search (non-authenticated public access).
+    Executes $geoNear pipeline to locate disasters within radiusKm of input coordinate.
+    """
+    pipeline = [
+        {
+            "$geoNear": {
+                "near": {
+                    "type": "Point",
+                    "coordinates": [longitude, latitude]
+                },
+                "distanceField": "distanceKm",
+                "maxDistance": radiusKm * 1000.0,
+                "distanceMultiplier": 0.001,
+                "spherical": True
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "disNo": 1,
+                "disasterType": 1,
+                "distanceKm": 1,
+                "deaths": "$impact.deaths"
+            }
+        },
+        {
+            "$limit": limit
+        }
+    ]
+
+    try:
+        cursor = db.disaster_records.aggregate(pipeline)
+        results = await cursor.to_list(length=limit)
+        
+        lookups = []
+        for r in results:
+            lookups.append({
+                "disNo": r["disNo"],
+                "disasterType": r["disasterType"],
+                "distanceKm": round(r["distanceKm"], 2),
+                "deaths": r.get("deaths") or 0
+            })
+        return lookups
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database aggregation error: {str(e)}")
+

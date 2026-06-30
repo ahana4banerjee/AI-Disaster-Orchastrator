@@ -42,7 +42,7 @@ export function PublicNavbar() {
     localStorage.removeItem("email");
     setIsLoggedIn(false);
     setUserEmail(null);
-    router.push("/login");
+    window.location.href = "/login";
   };
 
   const navItems = [

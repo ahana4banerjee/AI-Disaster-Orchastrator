@@ -70,3 +70,33 @@ class TestPublicAPI(unittest.TestCase):
         # Limit must be le 50 (restricted in router validation)
         response = self.client.get("/api/v1/public/disasters?limit=100")
         self.assertEqual(response.status_code, 422) # Unprocessable Entity
+
+    def test_get_public_nearby_disasters_success(self):
+        mock_cursor = MagicMock()
+        mock_results = [
+            {
+                "disNo": "2026-0153-KEN",
+                "disasterType": "Flood",
+                "distanceKm": 12.45,
+                "deaths": 59
+            }
+        ]
+        mock_cursor.to_list = AsyncMock(return_value=mock_results)
+        self.mock_db.disaster_records.aggregate.return_value = mock_cursor
+
+        response = self.client.get("/api/v1/public/disasters/nearby?longitude=39.66&latitude=-4.04&radiusKm=500&limit=5")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["disNo"], "2026-0153-KEN")
+        self.assertEqual(data[0]["distanceKm"], 12.45)
+
+    def test_get_public_nearby_disasters_invalid_coordinates(self):
+        # Latitude must be <= 90
+        response = self.client.get("/api/v1/public/disasters/nearby?longitude=39.66&latitude=95.0")
+        self.assertEqual(response.status_code, 422)
+
+        # Longitude must be >= -180
+        response = self.client.get("/api/v1/public/disasters/nearby?longitude=-185.0&latitude=10.0")
+        self.assertEqual(response.status_code, 422)
+
