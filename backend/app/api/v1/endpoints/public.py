@@ -548,6 +548,32 @@ async def get_preparedness_checklist(
         # 1. Compile the live dataset awareness profile for the hazard
         profile = await get_dynamic_awareness_profile(disasterType, db)
         
+        # 2. Query MongoDB disaster_records to get localized risk averages
+        c_query = {
+            "country": {"$regex": f"^{country.strip()}$", "$options": "i"},
+            "disasterType": {"$regex": f"^{disasterType.strip()}$", "$options": "i"}
+        }
+        cursor = db.disaster_records.find(c_query)
+        records = await cursor.to_list(length=1000)
+        
+        count = len(records)
+        total_deaths = sum(r.get("impact", {}).get("deaths") or 0 for r in records)
+        avg_deaths = round(total_deaths / count, 1) if count > 0 else 0.0
+        max_mag = max((r.get("magnitude") or 0.0 for r in records), default=0.0)
+        mag_scale = next((r.get("magnitudeScale") for r in records if r.get("magnitudeScale")), "Mw")
+        total_damage = sum(r.get("impact", {}).get("economicDamageUSD") or 0.0 for r in records)
+        avg_damage = round(total_damage / count, 1) if count > 0 else 0.0
+        
+        # Extract top subnational regions/locations
+        locations = [r.get("location") for r in records if r.get("location")]
+        loc_counts = {}
+        for loc in locations:
+            clean_loc = loc.strip()
+            if clean_loc:
+                loc_counts[clean_loc] = loc_counts.get(clean_loc, 0) + 1
+        sorted_locs = sorted(loc_counts.items(), key=lambda x: x[1], reverse=True)
+        top_locations = ", ".join([x[0] for x in sorted_locs[:2]])
+        
         checklist = []
         
         # 2. Add Universal Essentials (Critical priority)
@@ -576,20 +602,45 @@ async def get_preparedness_checklist(
             "category": "Supplies",
             "priority": "Critical"
         })
-        checklist.append({
-            "item": "Secure copies of crucial documents (ID cards, insurance deeds, medical logs) in water-resistant sleeves",
-            "category": "Documents",
-            "priority": "Critical"
-        })
 
-        # 3. Add Hazard-Specific Actions from the EOC awareness guide
-        for act in profile.get("before", [])[:4]:
+        # 4. Assemble dynamic Documents checklists
+        if avg_damage > 100000.0:
             checklist.append({
-                "item": act,
+                "item": f"Catalog all household physical assets and secure premium structural insurance (since historical {disasterType.strip()} events in {country.strip()} average ${avg_damage:,.0f} USD in damages)",
+                "category": "Documents",
+                "priority": "Critical"
+            })
+        else:
+            checklist.append({
+                "item": "Safeguard crucial property deeds, insurance policies, and ID credentials in water-resistant sleeves",
+                "category": "Documents",
+                "priority": "Critical"
+            })
+
+        # 5. Assemble dynamic Action Items based on average deaths
+        if avg_deaths > 1.0:
+            checklist.append({
+                "item": f"Pre-arrange family assembly points and perform quarterly evacuation drills (due to high casualty severity average of {avg_deaths} deaths per event in {country.strip()})",
+                "category": "Action Item",
+                "priority": "Critical"
+            })
+        else:
+            checklist.append({
+                "item": "Establish emergency contact logs and designate a family reunion coordinator outside the immediate zone",
                 "category": "Action Item",
                 "priority": "Recommended"
             })
             
+        # Add dynamic guidelines from awareness template before/during arrays
+        for act in profile.get("before", [])[:3]:
+            # Clean items that might duplicate the logic
+            if "evacuation paths" not in act.lower():
+                checklist.append({
+                    "item": act,
+                    "category": "Action Item",
+                    "priority": "Recommended"
+                })
+                
         for act in profile.get("during", [])[:2]:
             checklist.append({
                 "item": act,
@@ -597,30 +648,44 @@ async def get_preparedness_checklist(
                 "priority": "Critical"
             })
 
-        # 4. Query country-specific historical records to compile localized risk items
-        c_query = {
-            "country": {"$regex": f"^{country.strip()}$", "$options": "i"},
-            "disasterType": {"$regex": f"^{disasterType.strip()}$", "$options": "i"}
-        }
-        c_count = await db.disaster_records.count_documents(c_query)
-        if c_count > 5:
+        # 6. Add dynamic magnitude-specific structural warning action items
+        if max_mag > 0.0:
+            if disasterType.lower() in ("earthquake", "volcanic activity", "landslide"):
+                checklist.append({
+                    "item": f"Secure heavy shelving, cabinets, and appliances to wall studs to withstand tremors up to the historical peak of {max_mag:.1f} {mag_scale} logged in this area",
+                    "category": "Action Item",
+                    "priority": "Recommended"
+                })
+            elif disasterType.lower() in ("storm", "flood"):
+                checklist.append({
+                    "item": f"Review roof drainage channels and structural wind tolerances matching the peak magnitude of {max_mag:.1f} {mag_scale} logged historically",
+                    "category": "Action Item",
+                    "priority": "Recommended"
+                })
+
+        # 7. Add dynamic Regional Info and localized warning zones
+        if count > 5:
             checklist.append({
-                "item": f"High Risk Alert: {country.strip()} has registered {c_count} historical {disasterType.strip()} disasters in the EOC dataset. Ensure household communication lines are clear.",
+                "item": f"High Risk Alert: {country.strip()} has registered {count} historical {disasterType.strip()} disasters in the EOC dataset. Ensure household communication lines are clear.",
                 "category": "Regional Info",
                 "priority": "Critical"
             })
-        elif c_count > 0:
+        elif count > 0:
             checklist.append({
                 "item": f"Regional Precaution: {country.strip()} has documented history of {disasterType.strip()} events in the EOC dataset.",
                 "category": "Regional Info",
                 "priority": "Recommended"
             })
             
+        if top_locations:
+            checklist.append({
+                "item": f"Identify floodways or local elevation maps for high-risk EOC impact zones: {top_locations}",
+                "category": "Regional Info",
+                "priority": "Critical"
+            })
+            
         return checklist
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Checklist generation error: {str(e)}")
-
-
-
 
 

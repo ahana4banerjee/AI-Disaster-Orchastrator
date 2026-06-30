@@ -172,6 +172,24 @@ class TestPublicAPI(unittest.TestCase):
             "after": [],
             "resources": []
         })
+        self.mock_db.disaster_awareness.count_documents = AsyncMock(return_value=1)
+        
+        mock_cursor = MagicMock()
+        mock_records = [
+            {
+                "country": "Kenya",
+                "disasterType": "Flood",
+                "magnitude": 4.5,
+                "magnitudeScale": "Mw",
+                "location": "Mombasa",
+                "impact": {
+                    "deaths": 10,
+                    "economicDamageUSD": 100000.0
+                }
+            }
+        ]
+        mock_cursor.to_list = AsyncMock(return_value=mock_records)
+        self.mock_db.disaster_records.find.return_value = mock_cursor
         self.mock_db.disaster_records.count_documents = AsyncMock(return_value=10)
 
         response = self.client.get("/api/v1/public/preparedness/checklist?country=Kenya&disasterType=Flood")
@@ -180,6 +198,7 @@ class TestPublicAPI(unittest.TestCase):
         self.assertTrue(len(data) >= 7) # 6 essentials + hazard actions + country info
         self.assertEqual(data[0]["category"], "Supplies")
         self.assertEqual(data[-1]["category"], "Regional Info")
+
         self.assertEqual(data[-1]["priority"], "Critical")
 
     def test_get_preparedness_checklist_missing_params(self):
