@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
 from datetime import datetime
 from app.core.database import get_db
-from app.models.schemas.disaster import PaginatedDisasterRecordsResponse
+from app.models.schemas.disaster import PaginatedDisasterRecordsResponse, RiskCheckerResponse, ThreatProfile
 
 from app.models.schemas.analytics import SpatialResponse
 
@@ -106,4 +106,108 @@ async def get_public_nearby_disasters(
         return lookups
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database aggregation error: {str(e)}")
+
+
+@router.get("/risk-checker", response_model=RiskCheckerResponse)
+async def get_public_risk_checker(
+    country: str = Query(..., description="Target country"),
+    region: Optional[str] = Query(default=None, description="Subnational region or state"),
+    db = Depends(get_db)
+):
+    """
+    Public risk checker score generator.
+    Aggregates threat incident counts, calculates risk score, and maps top threat vectors.
+    """
+    if not country.strip():
+        raise HTTPException(status_code=400, detail="Country parameter cannot be empty")
+
+    query = {"country": {"$regex": f"^{country.strip()}$", "$options": "i"}}
+    if region and region.strip():
+        query["$or"] = [
+            {"region": {"$regex": region.strip(), "$options": "i"}},
+            {"location": {"$regex": region.strip(), "$options": "i"}}
+        ]
+
+    try:
+        cursor = db.disaster_records.find(query)
+        records = await cursor.to_list(length=1000)
+
+        if not records:
+            return {
+                "country": country,
+                "region": region,
+                "riskScore": 0.0,
+                "riskLevel": "Low",
+                "totalEvents": 0,
+                "totalDeaths": 0,
+                "averageDamageUSD": 0.0,
+                "topThreats": []
+            }
+
+        total_events = len(records)
+        total_deaths = 0
+        total_damage = 0.0
+        damage_count = 0
+        
+        threat_counts = {}
+        total_severity_weight = 0
+        
+        for r in records:
+            total_deaths += r.get("impact", {}).get("deaths") or 0
+            
+            damage = r.get("impact", {}).get("economicDamageUSD")
+            if damage is not None:
+                total_damage += damage
+                damage_count += 1
+                
+            dtype = r.get("disasterType") or "Unknown"
+            threat_counts[dtype] = threat_counts.get(dtype, 0) + 1
+            
+            sev = (r.get("severityClass") or "").lower().strip()
+            if sev == "low":
+                total_severity_weight += 15
+            elif sev in ("medium", "moderate"):
+                total_severity_weight += 40
+            elif sev == "high":
+                total_severity_weight += 70
+            elif sev in ("extreme", "critical"):
+                total_severity_weight += 95
+            else:
+                total_severity_weight += 30
+
+        average_damage = total_damage / damage_count if damage_count > 0 else 0.0
+        
+        risk_score = round(total_severity_weight / total_events, 1)
+        if risk_score < 25.0:
+            risk_level = "Low"
+        elif risk_score < 50.0:
+            risk_level = "Moderate"
+        elif risk_score < 75.0:
+            risk_level = "High"
+        else:
+            risk_level = "Extreme"
+
+        top_threats = []
+        for dtype, count in threat_counts.items():
+            top_threats.append({
+                "disasterType": dtype,
+                "count": count,
+                "percentage": round((count / total_events) * 100.0, 1)
+            })
+        top_threats.sort(key=lambda x: x["count"], reverse=True)
+        top_threats = top_threats[:3]
+
+        return {
+            "country": country,
+            "region": region,
+            "riskScore": risk_score,
+            "riskLevel": risk_level,
+            "totalEvents": total_events,
+            "totalDeaths": total_deaths,
+            "averageDamageUSD": round(average_damage, 2),
+            "topThreats": top_threats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database aggregation query error: {str(e)}")
+
 

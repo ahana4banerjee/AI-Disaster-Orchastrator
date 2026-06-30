@@ -100,3 +100,36 @@ class TestPublicAPI(unittest.TestCase):
         response = self.client.get("/api/v1/public/disasters/nearby?longitude=-185.0&latitude=10.0")
         self.assertEqual(response.status_code, 422)
 
+    def test_get_public_risk_checker_success(self):
+        mock_cursor = MagicMock()
+        mock_records = [
+            {
+                "disNo": "2026-0001-KEN",
+                "disasterType": "Flood",
+                "country": "Kenya",
+                "location": "Mombasa",
+                "severityClass": "High",
+                "impact": {
+                    "deaths": 10,
+                    "economicDamageUSD": 100000.0
+                }
+            }
+        ]
+        mock_cursor.to_list = AsyncMock(return_value=mock_records)
+        self.mock_db.disaster_records.find.return_value = mock_cursor
+
+        response = self.client.get("/api/v1/public/risk-checker?country=Kenya&region=Mombasa")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["country"], "Kenya")
+        self.assertEqual(data["region"], "Mombasa")
+        self.assertEqual(data["totalEvents"], 1)
+        self.assertEqual(data["riskLevel"], "High")
+        self.assertEqual(len(data["topThreats"]), 1)
+        self.assertEqual(data["topThreats"][0]["disasterType"], "Flood")
+
+    def test_get_public_risk_checker_missing_country(self):
+        response = self.client.get("/api/v1/public/risk-checker")
+        self.assertEqual(response.status_code, 422) # Missing parameter query
+
+

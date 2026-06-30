@@ -172,3 +172,21 @@ class PaginatedDisasterRecordsResponse(BaseModel):
     totalPages: int
     data: List[DisasterRecordResponse]
 
+
+class ThreatProfile(BaseModel):
+    disasterType: str
+    count: int
+    percentage: float
+
+
+class RiskCheckerResponse(BaseModel):
+    country: str
+    region: Optional[str] = None
+    riskScore: float
+    riskLevel: str
+    totalEvents: int
+    totalDeaths: int
+    averageDamageUSD: float
+    topThreats: List[ThreatProfile]
+
+
