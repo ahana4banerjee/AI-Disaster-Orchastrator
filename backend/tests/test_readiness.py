@@ -60,3 +60,66 @@ class TestReadinessAPI(unittest.TestCase):
         self.assertEqual(data["userId"], "60a4f5f5f5f5f5f5f5f5f501")
         self.assertEqual(data["score"], 20)
         self.assertEqual(data["checkedItems"], ["water_3_days", "food_3_days"])
+
+    def test_get_family_plan_not_found(self):
+        self.mock_db.users.find_one = AsyncMock(return_value={"_id": "60a4f5f5f5f5f5f5f5f5f501", "email": "user@earth.org", "role": "public_user"})
+        self.mock_db.readiness_profiles.find_one = AsyncMock(return_value=None)
+
+        headers = {"Authorization": f"Bearer {self.token}"}
+        response = self.client.get("/api/v1/public/family-plan", headers=headers)
+        self.assertEqual(response.status_code, 404)
+
+    def test_get_family_plan_success(self):
+        self.mock_db.users.find_one = AsyncMock(return_value={"_id": "60a4f5f5f5f5f5f5f5f5f501", "email": "user@earth.org", "role": "public_user"})
+        profile_with_plan = {
+            "userId": "60a4f5f5f5f5f5f5f5f5f501",
+            "familyPlan": {
+                "memberCount": 4,
+                "contacts": "John: 555-0199",
+                "evacuationRoute": "EOC Shelter 3",
+                "medicalNeeds": "None",
+                "petAssistance": "Dog carrier",
+                "updatedAt": "2026-07-01T00:00:00"
+            }
+        }
+        self.mock_db.readiness_profiles.find_one = AsyncMock(return_value=profile_with_plan)
+
+        headers = {"Authorization": f"Bearer {self.token}"}
+        response = self.client.get("/api/v1/public/family-plan", headers=headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["memberCount"], 4)
+        self.assertEqual(data["contacts"], "John: 555-0199")
+
+    def test_post_family_plan_success(self):
+        self.mock_db.users.find_one = AsyncMock(return_value={"_id": "60a4f5f5f5f5f5f5f5f5f501", "email": "user@earth.org", "role": "public_user"})
+        self.mock_db.readiness_profiles.update_one = AsyncMock(return_value=None)
+
+        payload = {
+            "memberCount": 3,
+            "contacts": "911",
+            "evacuationRoute": "Main Highway North",
+            "medicalNeeds": "Inhaler",
+            "petAssistance": "Cat cage"
+        }
+        headers = {"Authorization": f"Bearer {self.token}"}
+        response = self.client.post("/api/v1/public/family-plan", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["memberCount"], 3)
+        self.assertEqual(data["medicalNeeds"], "Inhaler")
+
+    def test_post_family_plan_invalid_member_count(self):
+        self.mock_db.users.find_one = AsyncMock(return_value={"_id": "60a4f5f5f5f5f5f5f5f5f501", "email": "user@earth.org", "role": "public_user"})
+        headers = {"Authorization": f"Bearer {self.token}"}
+        payload = {
+            "memberCount": 0, # Should fail gt=0 validation
+            "contacts": "911",
+            "evacuationRoute": "Main Highway North",
+            "medicalNeeds": "Inhaler",
+            "petAssistance": "Cat cage"
+        }
+        response = self.client.post("/api/v1/public/family-plan", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 422)
+
+

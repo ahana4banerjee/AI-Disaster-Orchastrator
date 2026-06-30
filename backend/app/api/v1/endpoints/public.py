@@ -6,7 +6,7 @@ from app.models.schemas.disaster import PaginatedDisasterRecordsResponse, RiskCh
 
 from app.models.schemas.analytics import SpatialResponse
 from app.api.v1.endpoints.auth import get_current_user
-from app.models.schemas.readiness import ReadinessProfileUpdate, ReadinessProfileResponse
+from app.models.schemas.readiness import ReadinessProfileUpdate, ReadinessProfileResponse, FamilyPlanCreate, FamilyPlanResponse
 
 
 router = APIRouter()
@@ -755,6 +755,65 @@ async def update_readiness_profile(
         return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database update error: {str(e)}")
+
+
+@router.get("/family-plan", response_model=FamilyPlanResponse)
+async def get_family_plan(
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """
+    Retrieve the current user's embedded family emergency planner.
+    """
+    user_id_str = str(current_user["_id"])
+    try:
+        profile = await db.readiness_profiles.find_one({"userId": user_id_str})
+        if not profile or "familyPlan" not in profile:
+            raise HTTPException(status_code=404, detail="Family emergency plan not found for the current user")
+        
+        # Merge userId into the response schema structure
+        plan_doc = dict(profile["familyPlan"])
+        plan_doc["userId"] = user_id_str
+        return plan_doc
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+
+@router.post("/family-plan", response_model=FamilyPlanResponse)
+async def create_or_update_family_plan(
+    payload: FamilyPlanCreate,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """
+    Create or update the embedded family emergency plan details inside readiness_profiles.
+    """
+    user_id_str = str(current_user["_id"])
+    try:
+        plan_data = {
+            "memberCount": payload.memberCount,
+            "contacts": payload.contacts,
+            "evacuationRoute": payload.evacuationRoute,
+            "medicalNeeds": payload.medicalNeeds,
+            "petAssistance": payload.petAssistance,
+            "updatedAt": datetime.utcnow()
+        }
+        
+        await db.readiness_profiles.update_one(
+            {"userId": user_id_str},
+            {"$set": {"familyPlan": plan_data}},
+            upsert=True
+        )
+        
+        # Construct response
+        response_data = dict(plan_data)
+        response_data["userId"] = user_id_str
+        return response_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database update error: {str(e)}")
+
 
 
 
