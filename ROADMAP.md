@@ -221,7 +221,7 @@ Each phase contains specific goals, dependencies, deliverables, risks, and crite
 ## Phase 9: LLM & RAG Safety Ingestion Pipeline
 
 ### Goals
-* Integrate Retrieval-Augmented Generation (RAG) and external LLM orchestration layers to dynamically query, extract, and compile hazard safety checklists, readiness assessment questions, regional awareness guides, and personalized family action plans.
+* Integrate Retrieval-Augmented Generation (RAG) and external LLM orchestration layers to dynamically query, extract, and compile hazard safety checklists, readiness assessment questions, regional awareness guides, personalized family action plans, and conversational assistant query replies.
 * Transition from deterministic dataset-derived rule templates to dynamic agentic planning modules.
 
 ### Deliverables
@@ -229,10 +229,12 @@ Each phase contains specific goals, dependencies, deliverables, risks, and crite
 * **LLM Checklist & Plan Ingestion Routes**: 
   * `/api/v1/public/preparedness/checklist/rag` and `/api/v1/public/readiness/questions/rag` leveraging external LLMs for local checklists and quizzes.
   * `/api/v1/public/family-plan/generate/rag` utilizing LLMs to synthesize customized family response protocols based on user inputs (pets, medical requirements, route notes).
+* **Conversational RAG Chatbot Endpoint**: Upgrade `/api/v1/public/ai-assistant/chat` to `/api/v1/public/ai-assistant/chat/rag` combining semantic vector search over safety handbooks with dynamic contextual responses.
 
 ### Dependencies
 * Complete deployment of Phase 8.
 * Configured LLM API keys (e.g., Gemini, OpenAI) and Vector Store configurations.
+
 
 
 
