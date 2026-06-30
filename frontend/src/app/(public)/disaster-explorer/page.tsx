@@ -568,22 +568,22 @@ export default function PublicDisasterExplorer() {
 
           {/* Results: Nearby disasters timeline */}
           <div className="lg:col-span-7">
-            <Card className="p-6 bg-bg-secondary border border-border-custom min-h-[460px] flex flex-col justify-between">
-              <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-border-custom pb-3">
-                  <div className="flex items-center gap-2">
-                    <Navigation className="h-4 w-4 text-accent-primary" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">
-                      Nearest Logged Incidents
-                    </h3>
-                  </div>
-                  <span className="text-[10px] text-text-muted font-mono uppercase font-bold tracking-wide">
-                    Results: {nearbyRecords.length}
-                  </span>
+            <Card className="p-6 bg-bg-secondary border border-border-custom h-[580px] flex flex-col">
+              <div className="flex items-center justify-between border-b border-border-custom pb-3 mb-4 shrink-0">
+                <div className="flex items-center gap-2">
+                  <Navigation className="h-4 w-4 text-accent-primary" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-text-primary">
+                    Nearest Logged Incidents
+                  </h3>
                 </div>
+                <span className="text-[10px] text-text-muted font-mono uppercase font-bold tracking-wide">
+                  Results: {nearbyRecords.length}
+                </span>
+              </div>
 
+              <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin">
                 {loading ? (
-                  <div className="space-y-6 py-4">
+                  <div className="space-y-6 py-2">
                     {Array.from({ length: 4 }).map((_, i) => (
                       <div key={i} className="flex gap-4 items-start animate-pulse">
                         <div className="h-3 w-3 bg-text-muted/10 rounded-full mt-1 shrink-0"></div>
