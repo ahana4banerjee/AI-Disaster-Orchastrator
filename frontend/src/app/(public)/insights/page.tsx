@@ -126,8 +126,8 @@ export default function RegionalDisasterInsights() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {[
           { label: "Extreme Risk Subregions", value: tierCounts["Extreme"] || 0, color: "border-l-severity-extreme" },
-          { label: "High Risk Subregions", value: (tierCounts["High"] || 0) + (tierCounts["Medium"] || 0), color: "border-l-severity-high" },
-          { label: "Moderate Risk Subregions", value: tierCounts["Moderate"] || 0, color: "border-l-severity-moderate" },
+          { label: "High Risk Subregions", value: tierCounts["High"] || 0, color: "border-l-severity-high" },
+          { label: "Moderate Risk Subregions", value: (tierCounts["Moderate"] || 0) + (tierCounts["Medium"] || 0), color: "border-l-severity-moderate" },
           { label: "Low Risk Subregions", value: tierCounts["Low"] || 0, color: "border-l-severity-low" },
         ].map((item, idx) => (
           <Card key={idx} className={`p-5 border-l-4 ${item.color}`}>
