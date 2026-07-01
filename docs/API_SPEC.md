@@ -607,3 +607,168 @@ This document describes the API endpoints, request/response payloads, validation
   }
   ```
 
+---
+
+## 11. Scenario Template Engine APIs
+
+### 11.1 Create Scenario Template
+* **Method**: `POST`
+* **Endpoint**: `/api/v1/scenarios`
+* **Authorization**: JWT (Admin Role Required)
+* **Request Schema**:
+  ```json
+  {
+    "name": "Storm Scenario Alpha",
+    "description": "Odisha coastal category 4 simulation",
+    "disasterType": "Storm",
+    "disasterSubtype": "Tropical cyclone",
+    "country": "India",
+    "iso": "IND",
+    "region": "Odisha",
+    "magnitude": 220.0,
+    "magnitudeScale": "Kph",
+    "timelineParameters": {
+      "durationHours": 48,
+      "cascadingIntervalHours": 12
+    },
+    "notes": "Evacuation shelters priority operational notes.",
+    "tags": ["cyclone", "eastern-grid"],
+    "status": "Published"
+  }
+  ```
+* **Response Schema (201 Created)**:
+  ```json
+  {
+    "id": "60a4f5f5f5f5f5f5f5f5f50b",
+    "name": "Storm Scenario Alpha",
+    "description": "Odisha coastal category 4 simulation",
+    "disasterType": "Storm",
+    "disasterSubtype": "Tropical cyclone",
+    "country": "India",
+    "iso": "IND",
+    "region": "Odisha",
+    "magnitude": 220.0,
+    "magnitudeScale": "Kph",
+    "timelineParameters": {
+      "durationHours": 48,
+      "cascadingIntervalHours": 12
+    },
+    "notes": "Evacuation shelters priority operational notes.",
+    "tags": ["cyclone", "eastern-grid"],
+    "status": "Published",
+    "createdBy": "60a4f5f5f5f5f5f5f5f5f500",
+    "createdAt": "2026-07-01T18:00:00Z",
+    "updatedAt": "2026-07-01T18:00:00Z"
+  }
+  ```
+
+### 11.2 List Scenarios
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/scenarios`
+* **Authorization**: JWT (Admin Role Required)
+* **Parameters**:
+  * `page` (int, default: 1)
+  * `limit` (int, default: 20)
+  * `search` (str, optional)
+  * `disasterType` (str, optional)
+  * `status` (str, optional)
+  * `sort` (str, default: `createdAt`)
+  * `order` (int, default: -1)
+* **Response Schema (200 OK)**:
+  ```json
+  {
+    "totalCount": 1,
+    "page": 1,
+    "totalPages": 1,
+    "data": [
+      {
+        "id": "60a4f5f5f5f5f5f5f5f5f50b",
+        "name": "Storm Scenario Alpha",
+        "disasterType": "Storm",
+        "magnitude": 220.0,
+        "magnitudeScale": "Kph",
+        "status": "Published",
+        "createdAt": "2026-07-01T18:00:00Z"
+      }
+    ]
+  }
+  ```
+
+### 11.3 Retrieve Single Scenario
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/scenarios/{id}`
+* **Authorization**: JWT (Admin Role Required)
+* **Response Schema (200 OK)**: Returns full Scenario detail schema.
+
+### 11.4 Update Scenario
+* **Method**: `PUT`
+* **Endpoint**: `/api/v1/scenarios/{id}`
+* **Authorization**: JWT (Admin Role Required)
+* **Request Schema**: ScenarioUpdate Pydantic optional parameters payload.
+* **Response Schema (200 OK)**: Returns updated Scenario document.
+
+### 11.5 Duplicate Scenario
+* **Method**: `POST`
+* **Endpoint**: `/api/v1/scenarios/{id}/duplicate`
+* **Authorization**: JWT (Admin Role Required)
+* **Response Schema (201 Created)**: Returns duplicated Scenario document with `" - Copy"` suffix name.
+
+### 11.6 Delete Scenario
+* **Method**: `DELETE`
+* **Endpoint**: `/api/v1/scenarios/{id}`
+* **Authorization**: JWT (Admin Role Required)
+* **Response Status**: `204 No Content` on successful purge.
+
+### 11.7 Batch Compare Scenarios
+* **Method**: `POST`
+* **Endpoint**: `/api/v1/admin/scenarios/compare`
+* **Authorization**: JWT (Admin Role Required)
+* **Request Schema**:
+  ```json
+  {
+    "scenarioIds": ["60a4f5f5f5f5f5f5f5f5f50b", "60a4f5f5f5f5f5f5f5f5f50c"]
+  }
+  ```
+* **Response Schema (200 OK)**:
+  ```json
+  [
+    {
+      "id": "60a4f5f5f5f5f5f5f5f5f50b",
+      "name": "Storm Scenario Alpha",
+      "disasterType": "Storm",
+      "magnitude": 220.0,
+      "magnitudeScale": "Kph",
+      "country": "India",
+      "region": "Odisha",
+      "predictions": {
+        "severityClass": "Extreme",
+        "impactMetrics": {
+          "expectedDeaths": 42,
+          "expectedTotalAffected": 145000,
+          "expectedDamageUSD": 1450000.0
+        },
+        "confidenceScore": 0.85,
+        "riskIndex": 82.5
+      },
+      "requiredResources": {
+        "ambulances": 1471,
+        "generators": 290,
+        "waterLiters": 435000
+      },
+      "historicalAnalogs": [
+        {
+          "year": 2013,
+          "country": "India",
+          "location": "Ganjam",
+          "magnitude": 260.0,
+          "deaths": 44,
+          "affectedPopulation": 13200000,
+          "economicDamageUSD": 1500000.0,
+          "similarityPercentage": 92.5
+        }
+      ]
+    }
+  ]
+  ```
+
+
