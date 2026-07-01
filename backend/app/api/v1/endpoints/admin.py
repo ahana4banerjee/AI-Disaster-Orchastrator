@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Depends, status, Query
 from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
+import httpx
+from app.core.config import settings
 from app.core.database import get_db
 from app.api.v1.endpoints.auth import get_current_admin
 from app.models.schemas.disaster import DisasterRecordCreate, DisasterRecordResponse, PaginatedDisasterRecordsResponse
@@ -154,3 +156,148 @@ async def get_audit_logs(
         return logs
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+class ScenarioCompareRequest(BaseModel):
+    scenarioIds: List[str]
+
+@router.post("/scenarios/compare")
+async def compare_scenarios_batch(
+    payload: ScenarioCompareRequest,
+    current_admin: dict = Depends(get_current_admin),
+    db = Depends(get_db)
+):
+    if not payload.scenarioIds:
+        raise HTTPException(status_code=400, detail="scenarioIds list cannot be empty")
+    if len(payload.scenarioIds) > 4:
+        raise HTTPException(status_code=400, detail="Cannot compare more than 4 scenarios at once")
+
+    obj_ids = []
+    for id_str in payload.scenarioIds:
+        try:
+            obj_ids.append(ObjectId(id_str))
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Invalid Scenario ObjectId: {id_str}")
+
+    try:
+        cursor = db.scenarios.find({"_id": {"$in": obj_ids}})
+        scenarios = await cursor.to_list(length=len(obj_ids))
+        if not scenarios:
+            raise HTTPException(status_code=404, detail="No matching scenarios found")
+
+        # Map by id to preserve payload order
+        sc_map = {str(sc["_id"]): sc for sc in scenarios}
+        results = []
+
+        async with httpx.AsyncClient() as client:
+            for s_id in payload.scenarioIds:
+                sc = sc_map.get(s_id)
+                if not sc:
+                    continue
+
+                # Run predictions via ML service
+                predict_payload = {
+                    "disasterType": sc.get("disasterType", "Storm"),
+                    "disasterSubtype": sc.get("disasterSubtype", ""),
+                    "country": sc.get("country", ""),
+                    "region": sc.get("region", ""),
+                    "magnitude": sc.get("magnitude", 0.0),
+                    "startMonth": 6
+                }
+                
+                predictions = {}
+                try:
+                    p_resp = await client.post(f"{settings.ML_SERVICE_URL}/predict/", json=predict_payload, timeout=5.0)
+                    if p_resp.status_code == 200:
+                        predictions = p_resp.json()
+                except Exception:
+                    pass
+
+                # Run similarity via ML service
+                similarity_payload = {
+                    "disasterType": sc.get("disasterType", "Storm"),
+                    "country": sc.get("country", ""),
+                    "region": sc.get("region", ""),
+                    "magnitude": sc.get("magnitude", 0.0)
+                }
+                
+                analogs = []
+                try:
+                    s_resp = await client.post(f"{settings.ML_SERVICE_URL}/similarity/", json=similarity_payload, timeout=5.0)
+                    if s_resp.status_code == 200:
+                        analogs = s_resp.json()
+                except Exception:
+                    pass
+
+                # Handle predictions default / fallbacks if predictions is empty
+                if not predictions:
+                    # Heuristic calculation
+                    mag = sc.get("magnitude", 0.0)
+                    dtype = sc.get("disasterType", "Storm").lower()
+                    
+                    expected_deaths = 5
+                    expected_affected = 1000
+                    expected_damage = 50000.0
+                    
+                    if "storm" in dtype:
+                        expected_deaths = int(mag * 0.3)
+                        expected_affected = int(mag * 2000)
+                        expected_damage = mag * 50000.0
+                    elif "flood" in dtype:
+                        expected_deaths = int(mag * 0.5)
+                        expected_affected = int(mag * 3000)
+                        expected_damage = mag * 30000.0
+                    elif "earthquake" in dtype:
+                        expected_deaths = int(mag * 10)
+                        expected_affected = int(mag * 500)
+                        expected_damage = mag * 100000.0
+                    else:
+                        expected_deaths = int(mag * 0.2)
+                        expected_affected = int(mag * 1000)
+                        expected_damage = mag * 20000.0
+                        
+                    expected_deaths = max(1, expected_deaths)
+                    expected_affected = max(10, expected_affected)
+                    expected_damage = max(1000.0, expected_damage)
+
+                    predictions = {
+                        "severityClass": "Moderate",
+                        "impactMetrics": {
+                            "expectedDeaths": expected_deaths,
+                            "expectedTotalAffected": expected_affected,
+                            "expectedDamageUSD": expected_damage
+                        },
+                        "confidenceScore": 0.50,
+                        "riskIndex": 40.0
+                    }
+
+                # Resource requirements calculation
+                expected_deaths = predictions["impactMetrics"]["expectedDeaths"]
+                expected_affected = predictions["impactMetrics"]["expectedTotalAffected"]
+                
+                required_ambulances = max(5, int(expected_deaths * 0.5 + expected_affected * 0.01))
+                required_generators = max(10, int(expected_affected * 0.002))
+                required_water_liters = max(1000, int(expected_affected * 3))
+
+                results.append({
+                  "id": str(sc["_id"]),
+                  "name": sc["name"],
+                  "disasterType": sc["disasterType"],
+                  "disasterSubtype": sc.get("disasterSubtype", ""),
+                  "magnitude": sc["magnitude"],
+                  "magnitudeScale": sc.get("magnitudeScale", ""),
+                  "country": sc.get("country", ""),
+                  "region": sc.get("region", ""),
+                  "predictions": predictions,
+                  "requiredResources": {
+                    "ambulances": required_ambulances,
+                    "generators": required_generators,
+                    "waterLiters": required_water_liters
+                  },
+                  "historicalAnalogs": analogs
+                })
+                
+        return results
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database execution error: {str(e)}")

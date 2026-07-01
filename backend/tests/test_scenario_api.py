@@ -273,3 +273,53 @@ class TestScenarioAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 204) # 204 No Content
         self.assertTrue(self.mock_db.scenarios.delete_one.called)
 
+    # ------------------ BATCH COMPARE SCENARIO TESTS ------------------
+    def test_compare_scenarios_batch_success(self):
+        mock_scenario_1 = {
+            "_id": ObjectId("60a4f5f5f5f5f5f5f5f5f50b"),
+            "name": "Scenario One",
+            "disasterType": "Storm",
+            "magnitude": 220.0,
+            "magnitudeScale": "Kph",
+            "country": "India",
+            "region": "Odisha"
+        }
+        mock_scenario_2 = {
+            "_id": ObjectId("60a4f5f5f5f5f5f5f5f5f50c"),
+            "name": "Scenario Two",
+            "disasterType": "Flood",
+            "magnitude": 15.0,
+            "magnitudeScale": "Km2",
+            "country": "Kenya",
+            "region": "Garissa"
+        }
+
+        # Setup mock db query
+        mock_cursor = MagicMock()
+        mock_cursor.to_list = AsyncMock(return_value=[mock_scenario_1, mock_scenario_2])
+        self.mock_db.scenarios.find.return_value = mock_cursor
+
+        payload = {
+            "scenarioIds": ["60a4f5f5f5f5f5f5f5f5f50b", "60a4f5f5f5f5f5f5f5f5f50c"]
+        }
+
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        response = self.client.post("/api/v1/admin/scenarios/compare", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["name"], "Scenario One")
+        self.assertEqual(data[1]["name"], "Scenario Two")
+        self.assertTrue("predictions" in data[0])
+        self.assertTrue("requiredResources" in data[0])
+
+    def test_compare_scenarios_batch_too_many(self):
+        payload = {
+            "scenarioIds": ["1", "2", "3", "4", "5"]
+        }
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        response = self.client.post("/api/v1/admin/scenarios/compare", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("compare more than 4", response.json()["detail"])
+
+
