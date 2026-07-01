@@ -13,6 +13,7 @@ import {
   FileText,
   Clock,
   Compass,
+  Loader2,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -64,6 +65,79 @@ export default function CreateScenarioWizard() {
     status: "Draft",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  const validateStep2 = () => {
+    const errs: Record<string, string> = {};
+    const durNum = parseInt(form.durationHours);
+    if (!form.durationHours.trim()) {
+      errs.durationHours = "Timeline duration limit is required";
+    } else if (isNaN(durNum) || durNum <= 0) {
+      errs.durationHours = "Duration must be a positive integer hours limit";
+    }
+
+    const intervalNum = parseInt(form.cascadingIntervalHours);
+    if (!form.cascadingIntervalHours.trim()) {
+      errs.cascadingIntervalHours = "Cascading interval hours step is required";
+    } else if (isNaN(intervalNum) || intervalNum <= 0) {
+      errs.cascadingIntervalHours = "Interval must be a positive integer hours step";
+    }
+
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validateStep2()) return;
+    setIsSaving(true);
+    setErrors({});
+
+    try {
+      const tags = form.tagsString
+        ? form.tagsString.split(",").map((t) => t.trim()).filter((t) => t.length > 0)
+        : [];
+      
+      const payload = {
+        name: form.name.trim(),
+        description: form.description.trim(),
+        disasterType: form.disasterType,
+        disasterSubtype: form.disasterSubtype,
+        country: form.country.trim(),
+        iso: form.iso.trim().toUpperCase(),
+        region: form.region.trim(),
+        magnitude: parseFloat(form.magnitude),
+        magnitudeScale: form.magnitudeScale,
+        timelineParameters: {
+          durationHours: parseInt(form.durationHours),
+          cascadingIntervalHours: parseInt(form.cascadingIntervalHours),
+        },
+        notes: form.notes.trim(),
+        tags: tags,
+        status: form.status,
+      };
+
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("http://localhost:8000/api/v1/scenarios/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        router.replace("/admin/scenarios");
+      } else {
+        const errorData = await res.json();
+        setErrors({ submit: errorData.detail || "API submission failed" });
+      }
+    } catch {
+      setErrors({ submit: "Unable to connect to the backend server. Please verify uvicorn is active." });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const validateStep1 = () => {
     const errs: Record<string, string> = {};
@@ -347,15 +421,107 @@ export default function CreateScenarioWizard() {
           </div>
         </Card>
       ) : (
-        <Card className="p-6 border-border-custom bg-bg-secondary text-center space-y-4">
-          <Clock className="h-10 w-10 text-text-muted mx-auto animate-pulse" />
-          <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider">
-            Step 2 Parameters Placeholder
-          </h3>
-          <p className="text-xs text-text-secondary">
-            Timeline intervals, tags mapping, and operational template persistence options are configured in Step 2.
-          </p>
-          <div className="flex justify-between border-t border-border-custom/50 pt-4 mt-6 select-none">
+        <Card className="p-6 space-y-6 border-border-custom bg-bg-secondary">
+          <div className="flex items-center gap-2 pb-2 border-b border-border-custom/50 select-none">
+            <Clock className="h-4.5 w-4.5 text-accent-teal" />
+            <h3 className="text-xs font-black uppercase tracking-wider text-text-primary">
+              Extended Parameters & Timeline
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Timeline Duration */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-secondary block">
+                Scenario Duration (Hours) *
+              </label>
+              <input
+                type="text"
+                name="durationHours"
+                value={form.durationHours}
+                onChange={handleChange}
+                placeholder="e.g. 48"
+                className="w-full h-10 px-3 bg-bg-primary border border-border-custom rounded-xl text-xs text-text-primary focus:outline-hidden focus:ring-1 focus:ring-accent-primary/20"
+              />
+              {errors.durationHours && (
+                <p className="text-[10px] font-bold text-severity-extreme">{errors.durationHours}</p>
+              )}
+            </div>
+
+            {/* Cascading Interval */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-secondary block">
+                Cascading Interval (Hours) *
+              </label>
+              <input
+                type="text"
+                name="cascadingIntervalHours"
+                value={form.cascadingIntervalHours}
+                onChange={handleChange}
+                placeholder="e.g. 12"
+                className="w-full h-10 px-3 bg-bg-primary border border-border-custom rounded-xl text-xs text-text-primary focus:outline-hidden focus:ring-1 focus:ring-accent-primary/20"
+              />
+              {errors.cascadingIntervalHours && (
+                <p className="text-[10px] font-bold text-severity-extreme">{errors.cascadingIntervalHours}</p>
+              )}
+            </div>
+
+            {/* Tags list */}
+            <div className="md:col-span-2 space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-secondary block">
+                Tags (Comma separated)
+              </label>
+              <input
+                type="text"
+                name="tagsString"
+                value={form.tagsString}
+                onChange={handleChange}
+                placeholder="e.g. cyclone, coastal-threat, high-priority"
+                className="w-full h-10 px-3 bg-bg-primary border border-border-custom rounded-xl text-xs text-text-primary focus:outline-hidden focus:ring-1 focus:ring-accent-primary/20"
+              />
+            </div>
+
+            {/* Template Notes */}
+            <div className="md:col-span-2 space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-secondary block">
+                Operational Template Notes
+              </label>
+              <textarea
+                name="notes"
+                value={form.notes}
+                onChange={handleChange}
+                placeholder="EOC operational directives, local response structures guidance..."
+                rows={3}
+                className="w-full p-3 bg-bg-primary border border-border-custom rounded-xl text-xs text-text-primary focus:outline-hidden focus:ring-1 focus:ring-accent-primary/20"
+              />
+            </div>
+
+            {/* Scenario Status Toggle */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-secondary block">
+                Publish Status *
+              </label>
+              <select
+                name="status"
+                value={form.status}
+                onChange={handleChange}
+                className="w-full h-10 px-3 bg-bg-primary border border-border-custom rounded-xl text-xs text-text-secondary focus:outline-hidden"
+              >
+                <option value="Draft">Save as Draft</option>
+                <option value="Published">Publish (Active Simulation Library)</option>
+              </select>
+            </div>
+          </div>
+
+          {errors.submit && (
+            <div className="p-3.5 bg-severity-extreme/10 border border-severity-extreme/20 rounded-xl flex gap-2">
+              <ShieldAlert className="h-4.5 w-4.5 text-severity-extreme shrink-0 mt-0.5" />
+              <p className="text-[11px] font-semibold text-severity-extreme">{errors.submit}</p>
+            </div>
+          )}
+
+          {/* Action Row */}
+          <div className="flex justify-between border-t border-border-custom/50 pt-4 select-none">
             <Button
               onClick={() => setStep(1)}
               variant="outline"
@@ -363,8 +529,21 @@ export default function CreateScenarioWizard() {
             >
               <ChevronLeft className="h-3.5 w-3.5" /> Back to Step 1
             </Button>
-            <Button disabled variant="primary" className="h-9 text-[10px] font-bold uppercase tracking-wider">
-              Create Scenario Template
+            <Button
+              onClick={handleSubmit}
+              disabled={isSaving}
+              variant="primary"
+              className="h-9 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-3.5 w-3.5" /> Create Scenario Template
+                </>
+              )}
             </Button>
           </div>
         </Card>
