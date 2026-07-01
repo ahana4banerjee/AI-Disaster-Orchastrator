@@ -137,3 +137,139 @@ class TestScenarioAPI(unittest.TestCase):
         headers = {"Authorization": f"Bearer {self.admin_token}"}
         response = self.client.post("/api/v1/scenarios/invalid_object_id/duplicate", headers=headers)
         self.assertEqual(response.status_code, 400)
+
+    # ------------------ LIST SCENARIO TESTS ------------------
+    def test_list_scenarios_success(self):
+        mock_scenarios = [
+            {
+                "_id": ObjectId("60a4f5f5f5f5f5f5f5f5f50b"),
+                "name": "Scenario One",
+                "description": "",
+                "disasterType": "Storm",
+                "disasterSubtype": "",
+                "country": "India",
+                "iso": "IND",
+                "region": "",
+                "magnitude": 220.0,
+                "magnitudeScale": "Kph",
+                "timelineParameters": {
+                    "durationHours": 48,
+                    "cascadingIntervalHours": 12
+                },
+                "notes": "",
+                "tags": [],
+                "status": "Published",
+                "createdBy": "60a4f5f5f5f5f5f5f5f5f500",
+                "createdAt": datetime.utcnow(),
+                "updatedAt": datetime.utcnow()
+            }
+        ]
+        self.mock_db.scenarios.count_documents = AsyncMock(return_value=1)
+        mock_cursor = MagicMock()
+        mock_cursor.sort.return_value = mock_cursor
+        mock_cursor.skip.return_value = mock_cursor
+        mock_cursor.limit.return_value = mock_cursor
+        mock_cursor.to_list = AsyncMock(return_value=mock_scenarios)
+        self.mock_db.scenarios.find.return_value = mock_cursor
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        response = self.client.get("/api/v1/scenarios/?disasterType=Storm&status=Published", headers=headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["totalCount"], 1)
+        self.assertEqual(data["data"][0]["name"], "Scenario One")
+
+    # ------------------ GET SCENARIO DETAIL TESTS ------------------
+    def test_get_scenario_success(self):
+        mock_scenario = {
+            "_id": ObjectId("60a4f5f5f5f5f5f5f5f5f50b"),
+            "name": "Scenario One",
+            "description": "",
+            "disasterType": "Storm",
+            "disasterSubtype": "",
+            "country": "India",
+            "iso": "IND",
+            "region": "",
+            "magnitude": 220.0,
+            "magnitudeScale": "Kph",
+            "timelineParameters": {
+                "durationHours": 48,
+                "cascadingIntervalHours": 12
+            },
+            "notes": "",
+            "tags": [],
+            "status": "Published",
+            "createdBy": "60a4f5f5f5f5f5f5f5f5f500",
+            "createdAt": datetime.utcnow(),
+            "updatedAt": datetime.utcnow()
+        }
+        self.mock_db.scenarios.find_one = AsyncMock(return_value=mock_scenario)
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        response = self.client.get("/api/v1/scenarios/60a4f5f5f5f5f5f5f5f5f50b", headers=headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["name"], "Scenario One")
+
+    def test_get_scenario_not_found(self):
+        self.mock_db.scenarios.find_one = AsyncMock(return_value=None)
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        response = self.client.get("/api/v1/scenarios/60a4f5f5f5f5f5f5f5f5f50b", headers=headers)
+        self.assertEqual(response.status_code, 404)
+
+    # ------------------ UPDATE SCENARIO TESTS ------------------
+    def test_update_scenario_success(self):
+        mock_scenario = {
+            "_id": ObjectId("60a4f5f5f5f5f5f5f5f5f50b"),
+            "name": "Scenario One",
+            "description": "",
+            "disasterType": "Storm",
+            "disasterSubtype": "",
+            "country": "India",
+            "iso": "IND",
+            "region": "",
+            "magnitude": 220.0,
+            "magnitudeScale": "Kph",
+            "timelineParameters": {
+                "durationHours": 48,
+                "cascadingIntervalHours": 12
+            },
+            "notes": "",
+            "tags": [],
+            "status": "Published",
+            "createdBy": "60a4f5f5f5f5f5f5f5f5f500",
+            "createdAt": datetime.utcnow(),
+            "updatedAt": datetime.utcnow()
+        }
+        self.mock_db.scenarios.find_one = AsyncMock(return_value=mock_scenario)
+        self.mock_db.scenarios.update_one = AsyncMock(return_value=None)
+        self.mock_db.audit_logs.insert_one = AsyncMock(return_value=None)
+
+        payload = {
+            "name": "Updated Name X",
+            "status": "Draft"
+        }
+        
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        response = self.client.put("/api/v1/scenarios/60a4f5f5f5f5f5f5f5f5f50b", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["name"], "Scenario One") # Returns the document retrieved
+        self.assertTrue(self.mock_db.scenarios.update_one.called)
+
+    # ------------------ DELETE SCENARIO TESTS ------------------
+    def test_delete_scenario_success(self):
+        mock_scenario = {
+            "_id": ObjectId("60a4f5f5f5f5f5f5f5f5f50b"),
+            "name": "Scenario to delete"
+        }
+        self.mock_db.scenarios.find_one = AsyncMock(return_value=mock_scenario)
+        self.mock_db.scenarios.delete_one = AsyncMock(return_value=None)
+        self.mock_db.audit_logs.insert_one = AsyncMock(return_value=None)
+
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        response = self.client.delete("/api/v1/scenarios/60a4f5f5f5f5f5f5f5f5f50b", headers=headers)
+        self.assertEqual(response.status_code, 204) # 204 No Content
+        self.assertTrue(self.mock_db.scenarios.delete_one.called)
+
