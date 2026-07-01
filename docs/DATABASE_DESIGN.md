@@ -500,6 +500,43 @@ Pre-calculated regional risk profiling data compiled using the K-Means clusterin
 
 ---
 
+## 13b. Hypothetical Scenario Templates (`scenarios`)
+
+### Purpose
+Contains user-created hypothetical disaster parameters to evaluate and run simulations.
+
+### Index Config
+* Compound Index: `{ "createdBy": 1, "createdAt": -1 }` (optimizes user template queries).
+* Weighted Text Index: `{ "name": "text", "description": "text", "tags": "text" }` (speeds up library dashboard searches).
+
+### Example Document
+```json
+{
+  "_id": { "$oid": "60a4f5f5f5f5f5f5f5f5f50b" },
+  "name": "Cyclone Odisha Baseline (Category 4 Equivalent)",
+  "description": "Base template for hurricane preparedness simulations on the east coast.",
+  "disasterType": "Storm",
+  "disasterSubtype": "Tropical cyclone",
+  "country": "India",
+  "iso": "IND",
+  "region": "Odisha",
+  "magnitude": 220.0,
+  "magnitudeScale": "Kph",
+  "timelineParameters": {
+    "durationHours": 48,
+    "cascadingIntervalHours": 12
+  },
+  "notes": "Requires high coastal shelter allocation.",
+  "tags": ["cyclone", "east-coast"],
+  "status": "Published",
+  "createdBy": { "$oid": "60a4f5f5f5f5f5f5f5f5f500" },
+  "createdAt": { "$date": "2026-07-01T18:00:00Z" },
+  "updatedAt": { "$date": "2026-07-01T18:00:00Z" }
+}
+```
+
+---
+
 ## 14. Aggregation Strategies
 
 To generate metrics without querying individual database rows on client requests, we use MongoDB aggregation pipelines:
