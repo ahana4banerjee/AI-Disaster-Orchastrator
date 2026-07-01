@@ -182,65 +182,133 @@ This document describes the API endpoints, request/response payloads, validation
 
 ## 3. Public APIs
 
-### 3.1 Get Personal Readiness Profile
+### 3.1 Retrieve Disaster Awareness Guides
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/public/awareness`
+* **Authorization**: None (Public)
+* **Response Schema (200 OK)**:
+  ```json
+  [
+    {
+      "hazard": "flood",
+      "description": "Rapid accumulation of water in normally dry landmass areas...",
+      "warningSigns": ["Rapidly rising water levels..."],
+      "before": ["Build an emergency kit..."],
+      "during": ["Evacuate immediately..."],
+      "after": ["Boil all drinking water..."],
+      "resources": ["FEMA Flood Safety Guide"]
+    }
+  ]
+  ```
+
+### 3.2 Retrieve Disaster Awareness Guide by Hazard
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/public/awareness/{hazard}`
+* **Authorization**: None (Public)
+* **Response Schema (200 OK)**: Single awareness guide object.
+
+### 3.3 Retrieve Dynamic Preparedness Packing Checklist
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/public/preparedness/checklist`
+* **Authorization**: None (Public)
+* **Request Parameters**:
+  * `country` (string, required)
+  * `disasterType` (string, required)
+* **Response Schema (200 OK)**:
+  ```json
+  [
+    {
+      "item": "Pack a 3-day supply of water...",
+      "category": "Supplies",
+      "priority": "Critical"
+    }
+  ]
+  ```
+
+### 3.4 Get Personal Readiness Profile
 * **Method**: `GET`
 * **Endpoint**: `/api/v1/public/readiness`
-* **Authorization**: Bearer Token (Role: `public_user`)
-* **Request Schema**: None
+* **Authorization**: Bearer Token (Role: `public_user` or `admin`)
 * **Response Schema (200 OK)**:
   ```json
   {
-    "id": "60a4f5f5f5f5f5f5f5f5f508",
-    "familySize": 4,
-    "hasElderly": true,
-    "hasChildren": false,
-    "vehiclesAvailable": 1,
-    "readinessScore": 85,
-    "checklistCompleted": [
-      "water_storage",
-      "emergency_kit",
-      "evacuation_plan"
-    ]
+    "userId": "60a4f5f5f5f5f5f5f5f5f506",
+    "checkedItems": [
+      "water_3_days",
+      "food_3_days",
+      "first_aid_kit"
+    ],
+    "score": 30,
+    "updatedAt": "2026-07-01T02:00:00Z"
   }
   ```
 
-### 3.2 Update Personal Readiness Checklist
+### 3.5 Update Personal Readiness Profile Checked Items
 * **Method**: `PUT`
 * **Endpoint**: `/api/v1/public/readiness`
-* **Authorization**: Bearer Token (Role: `public_user`)
+* **Authorization**: Bearer Token (Role: `public_user` or `admin`)
 * **Request Schema**:
   ```json
   {
-    "familySize": 4,
-    "hasElderly": true,
-    "hasChildren": false,
-    "vehiclesAvailable": 1,
-    "checklistCompleted": [
-      "water_storage",
-      "emergency_kit",
-      "evacuation_plan",
-      "backup_power"
+    "checkedItems": [
+      "water_3_days",
+      "food_3_days",
+      "first_aid_kit"
     ]
   }
   ```
-* **Response Schema (200 OK)**: Same structure as GET response, displaying calculated updated `readinessScore` (0-100).
-* **Validation Rules**:
-  * `familySize` must be positive integer.
+* **Response Schema (200 OK)**: Same as GET response, displaying calculated updated `score` (0-100).
 
-### 3.3 Create Family Emergency Plan
+### 3.6 Get Family Emergency Plan
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/public/family-plan`
+* **Authorization**: Bearer Token (Role: `public_user` or `admin`)
+* **Response Schema (200 OK)**:
+  ```json
+  {
+    "userId": "60a4f5f5f5f5f5f5f5f5f506",
+    "memberCount": 4,
+    "contacts": "[{\"name\":\"John\",\"relation\":\"Cousin\",\"phone\":\"555-0199\"}]",
+    "evacuationRoute": "Route 9 North to shelter site A",
+    "medicalNeeds": "Carry Insulin pack for grandfather",
+    "petAssistance": "Cat carrier and dry food pack",
+    "updatedAt": "2026-07-01T02:00:00Z"
+  }
+  ```
+
+### 3.7 Create or Update Family Emergency Plan
 * **Method**: `POST`
 * **Endpoint**: `/api/v1/public/family-plan`
-* **Authorization**: Bearer Token (Role: `public_user`)
+* **Authorization**: Bearer Token (Role: `public_user` or `admin`)
 * **Request Schema**:
   ```json
   {
-    "meetingPlace": "Central Park Playground",
-    "outOfTownContact": "+1-555-0199",
+    "memberCount": 4,
+    "contacts": "[{\"name\":\"John\",\"relation\":\"Cousin\",\"phone\":\"555-0199\"}]",
     "evacuationRoute": "Route 9 North to shelter site A",
-    "medicalSpecialInstructions": "Carry Insulin pack for grandfather"
+    "medicalNeeds": "Carry Insulin pack for grandfather",
+    "petAssistance": "Cat carrier and dry food pack"
   }
   ```
-* **Response Schema (201 Created)**: Same as request + `id` and `updatedAt` timestamps.
+* **Response Schema (200 OK)**: Same structure as GET response.
+
+### 3.8 AI Assistant Chat Gateway
+* **Method**: `POST`
+* **Endpoint**: `/api/v1/public/ai-assistant/chat`
+* **Authorization**: None (Public)
+* **Request Schema**:
+  ```json
+  {
+    "message": "how to prepare for a flood?"
+  }
+  ```
+* **Response Schema (200 OK)**:
+  ```json
+  {
+    "reply": "### EOC OFFICIAL BULLETIN: FLOOD SAFETY PROTOCOLS...",
+    "context": ["/awareness/flood", "/preparedness"]
+  }
+  ```
 
 ---
 

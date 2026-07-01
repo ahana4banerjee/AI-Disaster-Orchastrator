@@ -285,21 +285,25 @@ MongoDB Atlas is the single source of truth. The document-based schema handles r
 }
 ```
 
-#### 3. `readiness_profiles` (Stores public preparedness data)
+#### 3. `readiness_profiles` (Stores public preparedness progress & plans)
 ```json
 {
   "_id": "ObjectId",
-  "userId": "ObjectId",
-  "familySize": 4,
-  "hasElderly": true,
-  "hasChildren": false,
-  "vehiclesAvailable": 1,
-  "readinessScore": 85,
-  "checklistCompleted": [
-    "water_storage",
-    "emergency_kit",
-    "evacuation_plan"
+  "userId": "string",
+  "checkedItems": [
+    "water_3_days",
+    "food_3_days",
+    "first_aid_kit"
   ],
+  "score": 30,
+  "familyPlan": {
+    "memberCount": 4,
+    "contacts": "[{\"name\":\"John\",\"relation\":\"Cousin\",\"phone\":\"555-0199\"}]",
+    "evacuationRoute": "Route 9 North to shelter site A",
+    "medicalNeeds": "Carry Insulin pack for grandfather",
+    "petAssistance": "Cat carrier and dry food pack",
+    "updatedAt": "ISODate"
+  },
   "updatedAt": "ISODate"
 }
 ```

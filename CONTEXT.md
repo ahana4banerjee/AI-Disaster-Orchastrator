@@ -196,6 +196,9 @@ We ran python execution pipelines on the raw CSV and established the following p
 | **OAuth2 Form Login Payloads** | FastAPI's `OAuth2PasswordRequestForm` throws 422 validations if credential objects are POSTed as JSON objects. | Rewrote the login handler to construct `URLSearchParams` and submit with the `application/x-www-form-urlencoded` header. |
 | **Recharts SSR Hydration** | Dynamic SVG calculations in Recharts triggered hydration mismatches during Next.js page generation. | Wrapped Recharts elements inside React state hooks (`mounted` check in `useEffect`), fallback-rendering EOC KPI skeletons when not mounted. |
 | **Route Path Name Mismatches** | Navigating to EOC coordinates `/admin/simulation` resulted in 404s due to a pluralized directory name (`simulations`). | Consolidated directories, renaming and refactoring paths to a singular `simulation/page.tsx` route matching the sidebar array. |
+| **Offline Font Fetch Failures** | Next.js prefetching of Google Fonts during production builds failed under offline environments, blocking compilation. | Removed `next/font/google` and utilized system fonts ('Inter', 'JetBrains Mono', system-ui, monospace) already declared in Tailwind theme variables. |
+| **Bypass Static Forms Printing** | Printing raw text input boxes on the Family Planner is not actionable or professional for emergencies. | Compiled a dynamic EOC action plan generator parsing user's input fields (members, pets, contacts grid, evacuations, and medical rules) into a double-bordered protocol document, automatically redirecting prints to this layout. |
+| **Print CSS Columns Collapsing** | Media queries in print mode collapsed footer grids into vertical lists. | Enforced horizontal grid columns (`grid-template-columns: repeat(4, 1fr)`) and pinned the footer to the bottom of the page in the print stylesheet. |
 
 ---
 
@@ -212,10 +215,10 @@ We ran python execution pipelines on the raw CSV and established the following p
 When implementing the roadmap, proceed sequentially by reading the current phase description in `ROADMAP.md` and following these rules:
 
 ### How to trigger next steps:
-* To start the public citizen-facing portal and readiness scoring logic, prompt: **"Start Phase 4"**.
+* To start the administrative hypothetical disaster scenario builder and comparison dashboard, prompt: **"Start Phase 5"**.
 
-### Phase 4: Public Portal & Readiness Checker Execution Guide (What to do next)
-1. **Initialize Public Portal route group**: Move public portal routes under the Next.js `src/app/(public)/` route group to share a common `PublicLayout` containing EOC navbar headers and footers.
-2. **Build Risk Checker**: Create coordinates and country lookup forms, sending queries to the FastAPI `/api/v1/analytics/spatial` geospatial lookup API, and displaying regional threats.
-3. **Build Readiness Assessment**: Implement the multi-step questionnaire that calculates the citizen readiness index (0–100) and saves the results in the MongoDB `readiness_profiles` collection.
-4. **Create Family Planner**: Build the tabbed planning panel (Household, Contacts, Evacuation, Medical) and wire the PDF export button to download the printable evacuation brief.
+### Phase 5: Scenario Template Engine Execution Guide (What to do next)
+1. **Scenario Creation Endpoint**: Build `POST /api/v1/scenarios` allowing operators to construct and save hypothetical disaster parameters inside the `scenarios` collection.
+2. **Retrieve Scenarios Endpoint**: Build `GET /api/v1/scenarios` for paginated scenario queries.
+3. **Scenario Comparison UI**: Implement a side-by-side scenario dashboard in Next.js comparing forecasted casualties, logistics requirements, and severity risk categories.
+

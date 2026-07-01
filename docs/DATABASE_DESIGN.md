@@ -377,6 +377,41 @@ Unified storage containing user profile credentials, roles, authorization permis
 
 ---
 
+## 10a. Citizen Readiness Profiles (`readiness_profiles`)
+
+### Purpose
+Contains the citizen preparedness progress checklist items, overall safety score (0-100), and custom family emergency plans.
+
+### Index Config
+* Unique Compound Index: `{ "userId": 1 }` to prevent duplicate user profiles.
+
+### Example Document
+```json
+{
+  "_id": { "$oid": "60a4f5f5f5f5f5f5f5f5f50b" },
+  "userId": "60a4f5f5f5f5f5f5f5f5f506",
+  "checkedItems": [
+    "water_3_days",
+    "food_3_days",
+    "first_aid_kit",
+    "copies_documents",
+    "cash_reserves"
+  ],
+  "score": 50,
+  "familyPlan": {
+    "memberCount": 4,
+    "contacts": "[{\"name\":\"John\",\"relation\":\"Cousin\",\"phone\":\"555-0199\"}]",
+    "evacuationRoute": "Designated EOC high-ground shelter 3",
+    "medicalNeeds": "Insulin doses in fridge container",
+    "petAssistance": "Cat carriers and dry food pack",
+    "updatedAt": { "$date": "2026-07-01T02:00:00Z" }
+  },
+  "updatedAt": { "$date": "2026-07-01T02:00:00Z" }
+}
+```
+
+---
+
 ## 11. Admin Storage (`admin_audit_logs`)
 
 ### Purpose
