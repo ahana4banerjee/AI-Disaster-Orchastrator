@@ -131,6 +131,31 @@ def main():
     db.readiness_profiles.create_index([("userId", ASCENDING)], unique=True, name="userId_unique")
     print("Indexes on 'readiness_profiles' initialized.")
 
+    # Collection: scenarios
+    print("Building indexes on 'scenarios'...")
+    db.scenarios.create_index(
+        [
+            ("createdBy", ASCENDING),
+            ("createdAt", DESCENDING)
+        ],
+        name="createdBy_createdAt_compound"
+    )
+    from pymongo import TEXT
+    db.scenarios.create_index(
+        [
+            ("name", TEXT),
+            ("description", TEXT),
+            ("tags", TEXT)
+        ],
+        weights={
+            "name": 10,
+            "description": 5,
+            "tags": 2
+        },
+        name="name_description_tags_text"
+    )
+    print("Indexes on 'scenarios' initialized.")
+
     print("\nMongoDB Database Schema Initialization Completed Successfully.")
 
 if __name__ == "__main__":
