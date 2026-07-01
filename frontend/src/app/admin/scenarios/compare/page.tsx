@@ -360,9 +360,57 @@ export default function CompareScenariosBoard({ searchParams }: SearchParamsProp
 
                 {/* Required Water */}
                 <div className="flex items-center justify-between border-t border-border-custom/50 pt-2.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Potable Water (Liters)</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Potable Water</span>
                   <span className="text-xs font-bold font-mono text-text-primary">
                     {item.requiredResources.waterLiters.toLocaleString()} L
+                  </span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Resource Stockpile Deficits Card */}
+            <Card className="p-5 border-border-custom bg-bg-secondary space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-custom/50 select-none">
+                <AlertTriangle className="h-4 w-4 text-accent-secondary" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-text-primary">
+                  Resource Plan Deficits
+                </h3>
+              </div>
+
+              <div className="space-y-3 text-[10px]">
+                {/* Ambulance Deficit */}
+                <div className="flex justify-between border-b border-border-custom/30 pb-2">
+                  <span className="text-text-secondary">Ambulance Deficit (Stock: 100)</span>
+                  <span className={`font-mono font-bold ${
+                    item.requiredResources.ambulances > 100 ? "text-severity-extreme" : "text-accent-teal"
+                  }`}>
+                    {item.requiredResources.ambulances > 100 
+                      ? `-${item.requiredResources.ambulances - 100} deficit` 
+                      : "+ surplus"}
+                  </span>
+                </div>
+
+                {/* Generator Deficit */}
+                <div className="flex justify-between border-b border-border-custom/30 pb-2">
+                  <span className="text-text-secondary">Generators Deficit (Stock: 50)</span>
+                  <span className={`font-mono font-bold ${
+                    item.requiredResources.generators > 50 ? "text-severity-extreme" : "text-accent-teal"
+                  }`}>
+                    {item.requiredResources.generators > 50 
+                      ? `-${item.requiredResources.generators - 50} deficit` 
+                      : "+ surplus"}
+                  </span>
+                </div>
+
+                {/* Water Deficit */}
+                <div className="flex justify-between">
+                  <span className="text-text-secondary">Potable Water Deficit (Stock: 100k L)</span>
+                  <span className={`font-mono font-bold ${
+                    item.requiredResources.waterLiters > 100000 ? "text-severity-extreme" : "text-accent-teal"
+                  }`}>
+                    {item.requiredResources.waterLiters > 100000 
+                      ? `-${Math.round((item.requiredResources.waterLiters - 100000)).toLocaleString()} L deficit` 
+                      : "+ surplus"}
                   </span>
                 </div>
               </div>
@@ -402,6 +450,11 @@ export default function CompareScenariosBoard({ searchParams }: SearchParamsProp
                           <span>Intensity: {analog.magnitude}</span>
                         </div>
                       </div>
+                      <Link href={`/admin/records?country=${encodeURIComponent(analog.country)}&disasterType=${encodeURIComponent(item.disasterType)}`}>
+                        <span className="text-[9px] text-accent-primary hover:underline cursor-pointer block mt-1.5 font-bold select-none">
+                          Explore Record Telemetry &rarr;
+                        </span>
+                      </Link>
                     </div>
                   ))}
                 </div>
