@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Play, Pause, RotateCcw, AlertTriangle, CheckCircle, Flame, ShieldAlert, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -18,7 +19,7 @@ interface InfraState {
   details: string;
 }
 
-export default function SimulationPage() {
+function SimulationPageContent() {
   const [currentHour, setCurrentHour] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([
@@ -30,8 +31,8 @@ export default function SimulationPage() {
   const [status, setStatus] = useState<string>("Created");
   const [simName, setSimName] = useState<string>("Simulation Exercise");
 
-  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-  const idParam = searchParams ? searchParams.get("id") : null;
+  const searchParams = useSearchParams();
+  const idParam = searchParams.get("id");
 
   useEffect(() => {
     if (idParam) {
@@ -473,3 +474,18 @@ export default function SimulationPage() {
     </div>
   );
 }
+
+export default function SimulationPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <Loader2 className="h-8 w-8 text-accent-primary animate-spin" />
+        <span className="text-xs text-text-secondary font-mono">Loading simulation telemetry console...</span>
+      </div>
+    }>
+      <SimulationPageContent />
+    </Suspense>
+  );
+}
+
+import { Loader2 } from "lucide-react";
