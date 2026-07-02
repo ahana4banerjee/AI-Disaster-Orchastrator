@@ -43,6 +43,24 @@ class SimulationManager:
             "status": next_status,
             "updatedAt": datetime.utcnow()
         }
+
+        # If transition to Running, execute baseline step 0 predictions
+        if next_status == "Running" and not sim.get("timesteps"):
+            from app.services.timeline_engine import TimelineEngine
+            scenario_id = sim.get("scenarioId")
+            if scenario_id:
+                try:
+                    sc_oid = ObjectId(scenario_id) if isinstance(scenario_id, str) else scenario_id
+                    scenario = await db.scenarios.find_one({"_id": sc_oid})
+                    if scenario:
+                        step_0 = await TimelineEngine.run_step_0(scenario)
+                        update_data["timesteps"] = [step_0]
+                        update_data["currentStep"] = 0
+                        sim["timesteps"] = update_data["timesteps"]
+                        sim["currentStep"] = 0
+                except Exception:
+                    pass
+
         await db.simulations.update_one({"_id": sim_oid}, {"$set": update_data})
 
         # Insert audit log

@@ -210,18 +210,49 @@ function SimulationPageContent() {
     return () => clearInterval(timer);
   }, [isPlaying, currentHour]);
 
-  const handleStep = (hour: number) => {
+  const [activeStepData, setActiveStepData] = useState<any>(null);
+
+  const handleStep = async (hour: number) => {
     setCurrentHour(hour);
     const newLogs = getStepLogs(hour);
     setLogs(prev => [
       ...prev,
       ...newLogs
     ]);
+
+    if (simId) {
+      const stepIdx = hour === 0 ? 0 : hour === 6 ? 1 : hour === 12 ? 2 : hour === 24 ? 3 : 4;
+      try {
+        const token = localStorage.getItem("token") || "";
+        const res = await fetch(`http://localhost:8000/api/v1/simulations/${simId}/steps/${stepIdx}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setActiveStepData(data);
+        } else {
+          setActiveStepData(null);
+        }
+      } catch {
+        // Offline preview mock fallback
+        setActiveStepData({
+          step: stepIdx,
+          metrics: {
+            activeCasualties: hour === 0 ? 12 : hour === 6 ? 24 : hour === 12 ? 45 : hour === 24 ? 120 : 180,
+            displacedPopulation: hour === 0 ? 450 : hour === 6 ? 1200 : hour === 12 ? 3500 : hour === 24 ? 14000 : 25000,
+            structuralDamagePercentage: hour === 0 ? 1.5 : hour === 6 ? 12.0 : hour === 12 ? 34.5 : hour === 24 ? 65.0 : 85.0
+          }
+        });
+      }
+    } else {
+      setActiveStepData(null);
+    }
   };
 
   const handleReset = () => {
     setCurrentHour(0);
     setIsPlaying(false);
+    setActiveStepData(null);
     setLogs([
       { time: "00:00", message: "SYSTEM CORE RESET: Restored initial coordinates.", type: "info" },
       { time: "00:00", message: "READY: Select simulation step parameters to initialize.", type: "success" }
@@ -411,6 +442,33 @@ function SimulationPageContent() {
               </p>
             </div>
           </div>
+
+          {simId && (
+            <div className="grid grid-cols-3 gap-4 border-t border-border-custom pt-4 select-none">
+              <div className="p-3 bg-bg-primary/50 border border-border-custom rounded-xl space-y-1">
+                <span className="text-[9px] text-text-secondary uppercase tracking-wider block font-sans font-bold">Active Casualties</span>
+                <span className="text-base font-bold font-mono text-severity-extreme">
+                  {activeStepData?.metrics?.activeCasualties ?? "—"}
+                </span>
+              </div>
+              <div className="p-3 bg-bg-primary/50 border border-border-custom rounded-xl space-y-1">
+                <span className="text-[9px] text-text-secondary uppercase tracking-wider block font-sans font-bold">Displaced Pop.</span>
+                <span className="text-base font-bold font-mono text-accent-secondary">
+                  {activeStepData?.metrics?.displacedPopulation !== undefined 
+                    ? activeStepData.metrics.displacedPopulation.toLocaleString() 
+                    : "—"}
+                </span>
+              </div>
+              <div className="p-3 bg-bg-primary/50 border border-border-custom rounded-xl space-y-1">
+                <span className="text-[9px] text-text-secondary uppercase tracking-wider block font-sans font-bold">Structural Damage</span>
+                <span className="text-base font-bold font-mono text-accent-teal">
+                  {activeStepData?.metrics?.structuralDamagePercentage !== undefined 
+                    ? `${activeStepData.metrics.structuralDamagePercentage.toFixed(1)}%` 
+                    : "—"}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Infrastructure Status Grid (Right) */}

@@ -145,6 +145,32 @@ async def cancel_simulation(
 ):
     return await SimulationManager.update_state(db, id, "Cancelled", str(current_admin["_id"]))
 
+@router.get("/{id}/steps/{step_number}", response_model=dict)
+async def get_simulation_step(
+    id: str,
+    step_number: int,
+    current_admin: dict = Depends(get_current_admin),
+    db = Depends(get_db)
+):
+    try:
+        sim_id = ObjectId(id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid simulation ObjectId string")
+
+    simulation = await db.simulations.find_one({"_id": sim_id})
+    if not simulation:
+        raise HTTPException(status_code=404, detail="Simulation run not found")
+
+    timesteps = simulation.get("timesteps", [])
+    for step in timesteps:
+        if step.get("step") == step_number:
+            return step
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"Timestep index {step_number} is not computed yet for this simulation exercise"
+    )
+
 @router.websocket("/{id}/ws")
 async def simulation_ws_progress(
     websocket: WebSocket,
