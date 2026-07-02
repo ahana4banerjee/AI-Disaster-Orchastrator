@@ -25,6 +25,81 @@ export default function SimulationPage() {
     { time: "00:00", message: "SYSTEM CORE INITIALIZED: Listening on telemetry WebSocket...", type: "info" },
     { time: "00:00", message: "READY: Select simulation step parameters to initialize.", type: "success" }
   ]);
+
+  const [simId, setSimId] = useState<string | null>(null);
+  const [status, setStatus] = useState<string>("Created");
+  const [simName, setSimName] = useState<string>("Simulation Exercise");
+
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const idParam = searchParams ? searchParams.get("id") : null;
+
+  useEffect(() => {
+    if (idParam) {
+      setSimId(idParam);
+      const fetchSimDetails = async () => {
+        try {
+          const token = localStorage.getItem("token") || "";
+          const res = await fetch(`http://localhost:8000/api/v1/simulations/${idParam}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setSimName(data.name);
+            setStatus(data.status);
+            setLogs(prev => [
+              ...prev,
+              { time: "SYSTEM", message: `LOADED: Cloned simulation run configuration [${data.name}].`, type: "success" }
+            ]);
+          }
+        } catch {
+          // offline fallback
+          setStatus("Initialized");
+          setSimName("Cyclone Odisha Active Exercise");
+        }
+      };
+      fetchSimDetails();
+    }
+  }, [idParam]);
+
+  const handleStateAction = async (action: "start" | "pause" | "resume" | "cancel") => {
+    if (!simId) return;
+
+    if (action === "cancel") {
+      const confirm = window.confirm("Are you sure you want to terminate this active simulation? This action is irreversible.");
+      if (!confirm) return;
+    }
+
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch(`http://localhost:8000/api/v1/simulations/${simId}/${action}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStatus(data.status);
+        setLogs(prev => [
+          ...prev,
+          { time: "SYSTEM", message: `ACTION TRIGGERED: State transitioned to ${data.status}`, type: "success" }
+        ]);
+      } else {
+        const errorData = await res.json();
+        alert(errorData.detail || `Failed to transition state via ${action}`);
+      }
+    } catch {
+      let targetStatus = "Running";
+      if (action === "pause") targetStatus = "Paused";
+      if (action === "resume") targetStatus = "Running";
+      if (action === "cancel") targetStatus = "Cancelled";
+      if (action === "start") targetStatus = "Running";
+
+      setStatus(targetStatus);
+      setLogs(prev => [
+        ...prev,
+        { time: "SYSTEM (offline)", message: `ACTION TRIGGERED: State changed to ${targetStatus}`, type: "success" }
+      ]);
+    }
+  };
   
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
@@ -159,7 +234,24 @@ export default function SimulationPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 select-none">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-text-primary">Simulation Progression Engine</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold tracking-tight text-text-primary">
+              {simId ? simName : "Simulation Progression Engine"}
+            </h2>
+            {simId && (
+              <span className={`inline-flex items-center justify-center px-2 py-0.5 border text-[9px] font-bold rounded-sm tracking-wider uppercase ${
+                status === "Running" 
+                  ? "bg-severity-low/10 text-severity-low border-severity-low/20" 
+                  : status === "Paused" 
+                  ? "bg-severity-moderate/10 text-severity-moderate border-severity-moderate/20" 
+                  : status === "Completed"
+                  ? "bg-severity-low/10 text-severity-low border-severity-low/20"
+                  : "bg-severity-extreme/10 text-severity-extreme border-severity-extreme/20"
+              }`}>
+                {status}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-text-secondary mt-0.5 font-sans">
             Asynchronous temporal cascading steps, infrastructure outages, and logistical recommendations.
           </p>
@@ -178,24 +270,86 @@ export default function SimulationPage() {
           <div className="flex items-center justify-between border-b border-border-custom pb-4">
             <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Control Interface</span>
             <div className="flex items-center gap-2">
-              <Button
-                variant={isPlaying ? "outline" : "primary"}
-                size="sm"
-                className="flex items-center gap-1.5"
-                onClick={() => setIsPlaying(!isPlaying)}
-              >
-                {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                {isPlaying ? "Pause Stream" : "Run Cascade"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1.5"
-                onClick={handleReset}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Reset
-              </Button>
+              {simId ? (
+                <>
+                  {(status === "Created" || status === "Initialized") && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="flex items-center gap-1.5 animate-pulse"
+                      onClick={() => handleStateAction("start")}
+                    >
+                      <Play className="h-3.5 w-3.5" /> Start Simulation
+                    </Button>
+                  )}
+                  {status === "Running" && (
+                    <>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex items-center gap-1.5"
+                        onClick={() => handleStateAction("pause")}
+                      >
+                        <Pause className="h-3.5 w-3.5" /> Pause Exercise
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-1.5 border-severity-extreme/30 text-severity-extreme hover:bg-severity-extreme/5"
+                        onClick={() => handleStateAction("cancel")}
+                      >
+                        Terminate
+                      </Button>
+                    </>
+                  )}
+                  {status === "Paused" && (
+                    <>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex items-center gap-1.5"
+                        onClick={() => handleStateAction("resume")}
+                      >
+                        <Play className="h-3.5 w-3.5" /> Resume Exercise
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-1.5 border-severity-extreme/30 text-severity-extreme hover:bg-severity-extreme/5"
+                        onClick={() => handleStateAction("cancel")}
+                      >
+                        Terminate
+                      </Button>
+                    </>
+                  )}
+                  {(status === "Completed" || status === "Cancelled" || status === "Failed") && (
+                    <span className="text-[10px] text-text-secondary italic uppercase tracking-wider font-bold">
+                      Exercise Terminal ({status})
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant={isPlaying ? "outline" : "primary"}
+                    size="sm"
+                    className="flex items-center gap-1.5"
+                    onClick={() => setIsPlaying(!isPlaying)}
+                  >
+                    {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                    {isPlaying ? "Pause Stream" : "Run Cascade"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1.5"
+                    onClick={handleReset}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reset
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
