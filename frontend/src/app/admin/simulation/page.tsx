@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { Play, Pause, RotateCcw, AlertTriangle, CheckCircle, Flame, ShieldAlert, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -163,6 +164,11 @@ export default function SimulationPage() {
             Asynchronous temporal cascading steps, infrastructure outages, and logistical recommendations.
           </p>
         </div>
+        <Link href="/admin/simulation/new">
+          <Button variant="primary" className="h-9 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+            New Simulation Run
+          </Button>
+        </Link>
       </div>
 
       {/* Main Grid: Controls & Timeline (Left/Center) + Infra (Right) */}
