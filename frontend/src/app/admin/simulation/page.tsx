@@ -61,8 +61,40 @@ function SimulationPageContent() {
         type: msg.type === "ERROR" ? "danger" : "info"
       }
     ]);
+    if (msg.type === "TIMESTEP_UPDATE" && msg.data) {
+      const stepIdx = msg.data.step;
+      const hoursMap = [0, 6, 12, 24, 48];
+      const targetHour = hoursMap[stepIdx] || 0;
+      setCurrentHour(targetHour);
+      setActiveStepData(msg.data);
+      const stepLogs = getStepLogs(targetHour);
+      setLogs(prev => [...prev, ...stepLogs]);
+    }
     refreshSimulationData();
   });
+
+  const triggerProgress = async () => {
+    if (!simId) return;
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch(`http://localhost:8000/api/v1/simulations/${simId}/progress`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        setIsPlaying(false);
+      }
+    } catch {
+      // Offline preview fallback sequence
+      const currentIndex = hours.indexOf(currentHour);
+      if (currentIndex < hours.length - 1) {
+        const nextHour = hours[currentIndex + 1];
+        handleStep(nextHour);
+      } else {
+        setIsPlaying(false);
+      }
+    }
+  };
 
   useEffect(() => {
     if (idParam) {
@@ -228,17 +260,22 @@ function SimulationPageContent() {
     let timer: NodeJS.Timeout;
     if (isPlaying) {
       timer = setInterval(() => {
-        const currentIndex = hours.indexOf(currentHour);
-        if (currentIndex < hours.length - 1) {
-          const nextHour = hours[currentIndex + 1];
-          handleStep(nextHour);
+        if (simId && status === "Running") {
+          triggerProgress();
         } else {
-          setIsPlaying(false);
+          // Offline fallback
+          const currentIndex = hours.indexOf(currentHour);
+          if (currentIndex < hours.length - 1) {
+            const nextHour = hours[currentIndex + 1];
+            handleStep(nextHour);
+          } else {
+            setIsPlaying(false);
+          }
         }
       }, 3500);
     }
     return () => clearInterval(timer);
-  }, [isPlaying, currentHour]);
+  }, [isPlaying, currentHour, simId, status]);
 
   const [activeStepData, setActiveStepData] = useState<any>(null);
 

@@ -145,6 +145,14 @@ async def cancel_simulation(
 ):
     return await SimulationManager.update_state(db, id, "Cancelled", str(current_admin["_id"]))
 
+@router.post("/{id}/progress", response_model=SimulationResponse)
+async def progress_simulation(
+    id: str,
+    current_admin: dict = Depends(get_current_admin),
+    db = Depends(get_db)
+):
+    return await SimulationManager.advance_simulation(db, id, str(current_admin["_id"]))
+
 @router.get("/{id}/steps/{step_number}", response_model=dict)
 async def get_simulation_step(
     id: str,

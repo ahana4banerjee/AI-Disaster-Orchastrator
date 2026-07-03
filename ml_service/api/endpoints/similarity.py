@@ -63,11 +63,25 @@ async def run_similarity(payload: dict):
     lat = 0.0
     lon = 0.0
     centroids = cache["centroids"]
+    country_map = {
+        "india": "IND", "kenya": "KEN", "bangladesh": "BGD", "nepal": "NPL", 
+        "philippines": "PHL", "indonesia": "IDN", "sri lanka": "LKA"
+    }
     for code, info in centroids.items():
-        if info.get("country", "").lower() == query_country.lower() or code.lower() == query_country.lower():
+        if isinstance(info, dict):
+            c_name = info.get("country", "").lower()
+            c_lat = info.get("latitude", 0.0)
+            c_lon = info.get("longitude", 0.0)
+        else:
+            c_name = ""
+            c_lon = info[0] if len(info) > 0 else 0.0
+            c_lat = info[1] if len(info) > 1 else 0.0
+            
+        target_iso = country_map.get(query_country.lower(), query_country.lower())
+        if c_name == query_country.lower() or code.lower() == target_iso:
             iso = code
-            lat = info.get("latitude", 0.0)
-            lon = info.get("longitude", 0.0)
+            lat = c_lat
+            lon = c_lon
             break
             
     # Resolve subgroup mapping

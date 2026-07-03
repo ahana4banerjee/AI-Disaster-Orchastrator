@@ -69,3 +69,60 @@ class TimelineEngine:
             },
             "infrastructureStates": infra_states
         }
+
+    @staticmethod
+    async def run_step_1(scenario: dict, previous_step_doc: dict) -> dict:
+        decay_multiplier = 1.0
+        try:
+            similarity_payload = {
+                "disasterType": scenario.get("disasterType", "Storm"),
+                "country": scenario.get("country", ""),
+                "region": scenario.get("region", ""),
+                "magnitude": scenario.get("magnitude", 0.0)
+            }
+            async with httpx.AsyncClient() as client:
+                sim_resp = await client.post(
+                    f"{settings.ML_SERVICE_URL}/similarity/",
+                    json=similarity_payload,
+                    timeout=5.0
+                )
+                if sim_resp.status_code == 200:
+                    analogs = sim_resp.json()
+                    if isinstance(analogs, list) and len(analogs) > 0:
+                        first_score = analogs[0].get("similarity_score", 0.0)
+                        if first_score > 0.7:
+                            decay_multiplier = 1.25
+                        elif first_score > 0.5:
+                            decay_multiplier = 1.15
+        except Exception:
+            pass
+
+        prev_metrics = previous_step_doc.get("metrics", {})
+        prev_infra = previous_step_doc.get("infrastructureStates", [])
+
+        from app.services.cascade_engine import CascadeRulesEngine
+        new_infra = CascadeRulesEngine.process_cascades(prev_infra, hours_elapsed=6)
+
+        prev_deaths = prev_metrics.get("activeCasualties", 10)
+        prev_affected = prev_metrics.get("displacedPopulation", 1000)
+        prev_damage = prev_metrics.get("structuralDamagePercentage", 5.0)
+
+        power_failed = any(item for item in new_infra if item["name"] == "Power Grid" and item["status"] in ["Failed", "Critical"])
+        stress_factor = 1.3 if power_failed else 1.0
+
+        new_deaths = prev_deaths + int(prev_deaths * 0.12 * decay_multiplier * stress_factor)
+        new_affected = prev_affected + int(prev_affected * 0.08 * decay_multiplier * stress_factor)
+        new_damage = min(100.0, prev_damage + (4.5 * decay_multiplier * stress_factor))
+
+        return {
+            "step": 1,
+            "timeLabel": "Hour 6: Primary Grid Cascades",
+            "status": "Active",
+            "narrative": "Hour 6: Secondary utility failures observed. Primary electrical grid distribution outages have triggered telecommunications and water distribution failures across affected sectors.",
+            "metrics": {
+                "activeCasualties": max(1, new_deaths),
+                "displacedPopulation": max(10, new_affected),
+                "structuralDamagePercentage": round(new_damage, 2)
+            },
+            "infrastructureStates": new_infra
+        }

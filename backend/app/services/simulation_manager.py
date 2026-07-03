@@ -81,3 +81,115 @@ class SimulationManager:
         sim["status"] = next_status
         sim["updatedAt"] = update_data["updatedAt"]
         return sim
+
+    @staticmethod
+    async def advance_simulation(db, simulation_id: str, admin_user_id: str) -> dict:
+        try:
+            sim_oid = ObjectId(simulation_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid simulation ID format")
+
+        sim = await db.simulations.find_one({"_id": sim_oid})
+        if not sim:
+            raise HTTPException(status_code=404, detail="Simulation run not found")
+
+        current_status = sim.get("status", "Created")
+        if current_status != "Running":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot advance simulation: Current state is {current_status}. Must be Running."
+            )
+
+        timesteps = sim.get("timesteps", [])
+        current_step = sim.get("currentStep", 0)
+
+        next_step = current_step + 1
+        if next_step > 4:
+            raise HTTPException(status_code=400, detail="Simulation timeline limit reached (Hour 48)")
+
+        scenario_id = sim.get("scenarioId")
+        try:
+            sc_oid = ObjectId(scenario_id) if isinstance(scenario_id, str) else scenario_id
+            scenario = await db.scenarios.find_one({"_id": sc_oid})
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid scenario linked to this simulation")
+
+        if not scenario:
+            raise HTTPException(status_code=404, detail="Scenario template not found")
+
+        previous_step_doc = None
+        for step in timesteps:
+            if step.get("step") == current_step:
+                previous_step_doc = step
+                break
+
+        if not previous_step_doc:
+            raise HTTPException(status_code=400, detail=f"Preceding timestep {current_step} parameters not found")
+
+        from app.services.timeline_engine import TimelineEngine
+        next_step_doc = None
+        
+        if next_step == 1:
+            next_step_doc = await TimelineEngine.run_step_1(scenario, previous_step_doc)
+        else:
+            # Fallback/placeholder for steps 2, 3, 4 (implemented in Chunks 8, 9, 10)
+            from app.services.cascade_engine import CascadeRulesEngine
+            new_infra = CascadeRulesEngine.process_cascades(previous_step_doc.get("infrastructureStates", []), hours_elapsed=next_step * 12)
+            prev_metrics = previous_step_doc.get("metrics", {})
+            next_step_doc = {
+                "step": next_step,
+                "timeLabel": f"Hour {next_step * 12}: Progression",
+                "status": "Active",
+                "narrative": f"Simulation advanced to hour {next_step * 12}.",
+                "metrics": {
+                    "activeCasualties": prev_metrics.get("activeCasualties", 1) + 2,
+                    "displacedPopulation": prev_metrics.get("displacedPopulation", 10) + 50,
+                    "structuralDamagePercentage": min(100.0, prev_metrics.get("structuralDamagePercentage", 0.0) + 2.0)
+                },
+                "infrastructureStates": new_infra
+            }
+
+        await db.simulations.update_one(
+            {"_id": sim_oid},
+            {
+                "$set": {
+                    "currentStep": next_step,
+                    "updatedAt": datetime.utcnow()
+                },
+                "$push": {
+                    "timesteps": next_step_doc
+                }
+            }
+        )
+
+        updated_sim = await db.simulations.find_one({"_id": sim_oid})
+
+        try:
+            audit_log = {
+                "adminUserId": ObjectId(admin_user_id),
+                "action": "PROGRESS_SIMULATION",
+                "targetCollection": "simulations",
+                "targetObjectId": sim_oid,
+                "details": f"Advanced simulation step from {current_step} to {next_step}",
+                "timestamp": datetime.utcnow()
+            }
+            await db.admin_audit_logs.insert_one(audit_log)
+        except Exception:
+            pass
+
+        from app.core.websocket import manager
+        await manager.broadcast(
+            simulation_id,
+            {
+                "type": "TIMESTEP_UPDATE",
+                "data": {
+                    "step": next_step_doc["step"],
+                    "timeLabel": next_step_doc["timeLabel"],
+                    "infrastructureStates": next_step_doc["infrastructureStates"],
+                    "metrics": next_step_doc["metrics"],
+                    "narrative": next_step_doc["narrative"]
+                }
+            }
+        )
+
+        return updated_sim
