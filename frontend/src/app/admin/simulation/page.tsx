@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Play, Pause, RotateCcw, AlertTriangle, CheckCircle, Flame, ShieldAlert, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useSimulationWebSocket } from "@/hooks/useSimulationWebSocket";
 
 interface LogEntry {
   time: string;
@@ -33,6 +34,35 @@ function SimulationPageContent() {
 
   const searchParams = useSearchParams();
   const idParam = searchParams.get("id");
+
+  const refreshSimulationData = async () => {
+    if (!idParam) return;
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch(`http://localhost:8000/api/v1/simulations/${idParam}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSimName(data.name);
+        setStatus(data.status);
+      }
+    } catch {
+      // offline fallback
+    }
+  };
+
+  const { isConnected } = useSimulationWebSocket(simId, (msg) => {
+    setLogs(prev => [
+      ...prev,
+      {
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        message: `[TELEMETRY STREAM]: Broadcast event received: ${msg.type}`,
+        type: msg.type === "ERROR" ? "danger" : "info"
+      }
+    ]);
+    refreshSimulationData();
+  });
 
   useEffect(() => {
     if (idParam) {
@@ -266,7 +296,7 @@ function SimulationPageContent() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 select-none">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-bold tracking-tight text-text-primary">
               {simId ? simName : "Simulation Progression Engine"}
             </h2>
@@ -281,6 +311,16 @@ function SimulationPageContent() {
                   : "bg-severity-extreme/10 text-severity-extreme border-severity-extreme/20"
               }`}>
                 {status}
+              </span>
+            )}
+            {simId && (
+              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 border text-[9px] font-bold rounded-sm tracking-wider uppercase ${
+                isConnected 
+                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                  : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+              }`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`}></span>
+                {isConnected ? "Live telemetry" : "Connecting..."}
               </span>
             )}
           </div>

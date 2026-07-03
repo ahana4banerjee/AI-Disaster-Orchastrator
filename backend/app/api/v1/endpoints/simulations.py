@@ -171,6 +171,8 @@ async def get_simulation_step(
         detail=f"Timestep index {step_number} is not computed yet for this simulation exercise"
     )
 
+from app.core.websocket import manager
+
 @router.websocket("/{id}/ws")
 async def simulation_ws_progress(
     websocket: WebSocket,
@@ -178,8 +180,8 @@ async def simulation_ws_progress(
     token: str = Query(None),
     db = Depends(get_db)
 ):
-    await websocket.accept()
     if not token:
+        await websocket.accept()
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Access token missing")
         return
         
@@ -188,72 +190,92 @@ async def simulation_ws_progress(
         email = payload.get("sub")
         user = await db.users.find_one({"email": email})
         if not user:
+            await websocket.accept()
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="User unauthorized")
             return
     except JWTError:
+        await websocket.accept()
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token")
         return
         
     try:
         sim_id = ObjectId(id)
     except Exception:
+        await websocket.accept()
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid simulation ID")
         return
         
     simulation = await db.simulations.find_one({"_id": sim_id})
     if not simulation:
+        await websocket.accept()
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Simulation run not found")
         return
-        
-    scenario = await db.scenarios.find_one({"_id": ObjectId(simulation["scenarioId"])})
-    if not scenario:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Scenario not found")
-        return
 
-    # Update status to Running
-    await db.simulations.update_one({"_id": sim_id}, {"$set": {"status": "Running"}})
+    status_val = simulation.get("status", "Created")
+    if status_val == "Created":
+        scenario = await db.scenarios.find_one({"_id": ObjectId(simulation["scenarioId"])})
+        if not scenario:
+            await websocket.accept()
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Scenario not found")
+            return
 
-    try:
-        for step in range(3):
-            # Simulate processing delay
-            await asyncio.sleep(0.5)
-            
-            step_doc = generate_timestep(step, scenario)
-            
-            # Save timestep to database
-            await db.simulations.update_one(
-                {"_id": sim_id},
-                {"$push": {"timesteps": step_doc}}
-            )
-            
-            # Send status update message
+        await websocket.accept()
+        await db.simulations.update_one({"_id": sim_id}, {"$set": {"status": "Running"}})
+        try:
+            for step in range(3):
+                await asyncio.sleep(0.1)
+                step_doc = generate_timestep(step, scenario)
+                await db.simulations.update_one(
+                    {"_id": sim_id},
+                    {"$push": {"timesteps": step_doc}}
+                )
+                await websocket.send_json({
+                    "type": "TIMESTEP_UPDATE",
+                    "data": {
+                        "step": step_doc["step"],
+                        "timeLabel": step_doc["timeLabel"],
+                        "infrastructureStates": step_doc["infrastructureStates"]
+                    }
+                })
+            await db.simulations.update_one({"_id": sim_id}, {"$set": {"status": "Completed"}})
             await websocket.send_json({
-                "type": "TIMESTEP_UPDATE",
+                "type": "SIMULATION_COMPLETED",
                 "data": {
-                    "step": step_doc["step"],
-                    "timeLabel": step_doc["timeLabel"],
-                    "infrastructureStates": step_doc["infrastructureStates"]
+                    "simulationId": id,
+                    "status": "Completed"
                 }
             })
-            
-        # Update simulation status to Completed
-        await db.simulations.update_one({"_id": sim_id}, {"$set": {"status": "Completed"}})
-        await websocket.send_json({
-            "type": "SIMULATION_COMPLETED",
-            "data": {
-                "simulationId": id,
-                "status": "Completed"
-            }
-        })
-    except WebSocketDisconnect:
-        # Gracefully handle client closing connection early
-        pass
-    except Exception as e:
-        try:
-            await websocket.send_json({"type": "ERROR", "message": str(e)})
-        except Exception:
+        except WebSocketDisconnect:
             pass
+        finally:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+            return
+
+    await manager.connect(id, websocket)
+
+    try:
+        while True:
+            try:
+                # Wait for PING from client or trigger periodic HEARTBEAT
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=15.0)
+                if data.get("type") == "PING":
+                    await websocket.send_json({"type": "PONG"})
+            except asyncio.TimeoutError:
+                await websocket.send_json({
+                    "type": "HEARTBEAT",
+                    "data": {
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                })
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
     finally:
+        manager.disconnect(id, websocket)
         try:
             await websocket.close()
         except Exception:
