@@ -53,6 +53,9 @@ class TimelineEngine:
         expected_affected = max(10, expected_affected)
         expected_damage = max(1000.0, expected_damage)
 
+        from app.services.cascade_engine import InfrastructureStateEngine
+        infra_states = InfrastructureStateEngine.initialize_states(expected_deaths, expected_affected)
+
         # Hour 0 landfall details
         return {
             "step": 0,
@@ -64,9 +67,5 @@ class TimelineEngine:
                 "displacedPopulation": expected_affected,
                 "structuralDamagePercentage": min(100.0, max(1.0, float(expected_deaths * 0.05 + 1.0)))
             },
-            "infrastructureStates": {
-                "powerGrid": "Degraded",
-                "transportationRoads": "Operational",
-                "hospitals": "Operational"
-            }
+            "infrastructureStates": infra_states
         }

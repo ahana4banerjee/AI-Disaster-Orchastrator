@@ -15,8 +15,8 @@ interface LogEntry {
 
 interface InfraState {
   name: string;
-  status: "Operational" | "Degraded" | "Failed";
-  color: "emerald" | "amber" | "extreme";
+  status: string;
+  color: string;
   details: string;
 }
 
@@ -289,7 +289,9 @@ function SimulationPageContent() {
     ]);
   };
 
-  const activeInfra = initialInfra[currentHour] || initialInfra[0];
+  const activeInfra = (simId && activeStepData?.infrastructureStates)
+    ? activeStepData.infrastructureStates
+    : (initialInfra[currentHour] || initialInfra[0]);
 
   return (
     <div className="space-y-6">
@@ -519,7 +521,7 @@ function SimulationPageContent() {
           </div>
 
           <div className="grid grid-cols-1 gap-2.5 max-h-[300px] overflow-y-auto pr-1.5 scrollbar-thin">
-            {activeInfra.map((infra, idx) => (
+            {activeInfra.map((infra: InfraState, idx: number) => (
               <div 
                 key={idx}
                 className="bg-bg-primary/40 border border-border-custom rounded-xl p-3 flex items-center justify-between"
