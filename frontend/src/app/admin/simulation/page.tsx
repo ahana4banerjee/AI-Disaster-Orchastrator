@@ -839,6 +839,46 @@ function SimulationPageContent() {
             </div>
           </div>
 
+          {/* Simulation Completed Exercise Summary Panel */}
+          {currentHour >= 48 && (
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 space-y-4 select-none animate-[fadeIn_0.5s_ease-out]">
+              <div className="flex items-center gap-2 text-emerald-400">
+                <CheckCircle className="h-5 w-5 animate-bounce" />
+                <h4 className="text-sm font-bold uppercase tracking-wider font-sans">Simulation Exercise Concluded</h4>
+              </div>
+              
+              <p className="text-xs text-text-secondary leading-normal">
+                The temporal cascade has reached its final step (Hour 48). Critical service nodes are transitioning from crisis response to structured municipal recovery.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                {/* Recovery Duration Forecast Metric */}
+                <div className="p-4 bg-bg-secondary border border-border-custom rounded-lg space-y-1.5">
+                  <span className="text-[9px] uppercase tracking-wider text-text-secondary block font-bold">Estimated Restoration Period</span>
+                  <div className="flex items-baseline gap-1 text-accent-teal">
+                    <span className="text-2xl font-bold font-mono">
+                      {activeStepData?.metrics?.recoveryForecastDays ?? 14}
+                    </span>
+                    <span className="text-xs font-bold uppercase">Days</span>
+                  </div>
+                  <p className="text-[9px] text-text-secondary mt-1">
+                    Derived from historical KNN analog similarity matrices of comparable disaster profiles.
+                  </p>
+                </div>
+
+                {/* Tactical Recovery Insights */}
+                <div className="p-4 bg-bg-secondary border border-border-custom rounded-lg space-y-1">
+                  <span className="text-[9px] uppercase tracking-wider text-text-secondary block font-bold">Operational Recovery Directives</span>
+                  <ul className="text-[10px] text-text-secondary space-y-1 list-disc pl-3">
+                    <li>Prioritize utility line rebuilds on Highway 16.</li>
+                    <li>Stabilize cell tower secondary power lines.</li>
+                    <li>De-escalate hospital emergency surge protocols.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
           {simId && (
             <div className="grid grid-cols-3 gap-4 border-t border-border-custom pt-4 select-none">
               <div className="p-3 bg-bg-primary/50 border border-border-custom rounded-xl space-y-1">

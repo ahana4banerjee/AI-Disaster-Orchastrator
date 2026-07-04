@@ -306,3 +306,96 @@ class TimelineEngine:
             },
             "infrastructureStates": new_infra
         }
+
+    @staticmethod
+    async def run_step_4(scenario: dict, previous_step_doc: dict, db) -> dict:
+        prev_metrics = previous_step_doc.get("metrics", {})
+        prev_infra = previous_step_doc.get("infrastructureStates", [])
+
+        # ML Integration: Evaluate historical analog recovery periods from KNN search to estimate restoration timeline durations
+        similarity_payload = {
+            "disasterType": scenario.get("disasterType", "Storm"),
+            "country": scenario.get("country", ""),
+            "region": scenario.get("region", ""),
+            "magnitude": scenario.get("magnitude", 0.0)
+        }
+        
+        analogs = []
+        import httpx
+        from app.core.config import settings
+        try:
+            async with httpx.AsyncClient() as client:
+                sim_resp = await client.post(
+                    f"{settings.ML_SERVICE_URL}/similarity/",
+                    json=similarity_payload,
+                    timeout=5.0
+                )
+                if sim_resp.status_code == 200:
+                    analogs = sim_resp.json()
+        except Exception:
+            pass
+
+        restoration_days = 14.5  # Baseline fallback
+        if analogs and len(analogs) > 0:
+            top = analogs[0]
+            deaths = top.get("deaths", 10)
+            affected = top.get("affectedPopulation", 1000)
+            mag = top.get("magnitude", 80.0) or 80.0
+            
+            # KNN-derived restoration forecast
+            restoration_days = min(90.0, max(5.0, (deaths * 0.08 + affected * 0.0004 + mag * 0.03)))
+
+        # Cascade Rule: Hour 48 -> Utility recovery coefficients trigger (operational indices improve)
+        from app.services.cascade_engine import InfrastructureStateEngine
+        new_infra = []
+        for item in prev_infra:
+            cloned = dict(item)
+            name = cloned.get("name")
+            if name == "Power Grid":
+                cloned["status"] = "Recovery"
+                cloned["details"] = "Primary transmission grid restored; substation repairs ongoing."
+            elif name == "Road Network":
+                cloned["status"] = "Degraded"
+                cloned["details"] = "Key highway arteries cleared of storm debris; secondary routes blockages persisting."
+            elif name == "Telecommunications":
+                cloned["status"] = "Recovery"
+                cloned["details"] = "Mobile backhaul links stabilized; emergency telecom services active."
+            elif name == "Water Supply":
+                cloned["status"] = "Recovery"
+                cloned["details"] = "Emergency pumping stations operational; utility lines pressure returning."
+            elif name == "Hospitals":
+                cloned["status"] = "Degraded"
+                cloned["details"] = "Casualty surge plateaued; bed occupancy stabilizing."
+            elif name == "Fuel Supply":
+                cloned["status"] = "Recovery"
+                cloned["details"] = "Depot delivery routing restored; reserves at 70%."
+            elif name == "Emergency Shelters":
+                cloned["status"] = "Operational"
+                cloned["details"] = "Logistic pathways opened; normal supply lines active."
+            
+            cloned["color"] = InfrastructureStateEngine.get_color(cloned["status"])
+            new_infra.append(cloned)
+
+        # Final metrics: casualties stabilize, displacement decreases, damage plateaus
+        prev_deaths = prev_metrics.get("activeCasualties", 10)
+        prev_affected = prev_metrics.get("displacedPopulation", 1000)
+        prev_damage = prev_metrics.get("structuralDamagePercentage", 5.0)
+
+        # In recovery, active casualties level off, displaced population begins returning home
+        new_deaths = prev_deaths + max(0, int(prev_deaths * 0.02))
+        new_affected = max(10, int(prev_affected * 0.85))  # 15% displaced return home
+        new_damage = prev_damage  # damage plateaus
+
+        return {
+            "step": 4,
+            "timeLabel": "Hour 48: Recovery Thresholds",
+            "status": "Active",
+            "narrative": "Hour 48: Crisis peaks subsided. Restoration operations are underway across all sectors. Utility services are entering the recovery phase.",
+            "metrics": {
+                "activeCasualties": max(1, new_deaths),
+                "displacedPopulation": max(10, new_affected),
+                "structuralDamagePercentage": round(new_damage, 2),
+                "recoveryForecastDays": int(round(restoration_days))
+            },
+            "infrastructureStates": new_infra
+        }
