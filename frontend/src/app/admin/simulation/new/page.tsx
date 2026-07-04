@@ -64,7 +64,7 @@ export default function NewSimulationWizard() {
       setError(null);
       try {
         const token = localStorage.getItem("token") || "";
-        const res = await fetch("http://localhost:8000/api/v1/scenarios?limit=50", {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/scenarios?limit=50", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -123,7 +123,7 @@ export default function NewSimulationWizard() {
 
     try {
       const token = localStorage.getItem("token") || "";
-      const res = await fetch("http://localhost:8000/api/v1/simulations/", {
+      const res = await fetch("http://127.0.0.1:8000/api/v1/simulations/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

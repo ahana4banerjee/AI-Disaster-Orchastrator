@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Play, Pause, RotateCcw, AlertTriangle, CheckCircle, Flame, ShieldAlert, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useSimulationWebSocket } from "@/hooks/useSimulationWebSocket";
@@ -23,6 +23,8 @@ interface InfraState {
 function SimulationPageContent() {
   const [currentHour, setCurrentHour] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [speedMultiplier, setSpeedMultiplier] = useState<number>(1);
+  const [logQueue, setLogQueue] = useState<LogEntry[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([
     { time: "00:00", message: "SYSTEM CORE INITIALIZED: Listening on telemetry WebSocket...", type: "info" },
     { time: "00:00", message: "READY: Select simulation step parameters to initialize.", type: "success" }
@@ -32,16 +34,40 @@ function SimulationPageContent() {
   const [status, setStatus] = useState<string>("Created");
   const [simName, setSimName] = useState<string>("Simulation Exercise");
 
+  const router = useRouter();
   const searchParams = useSearchParams();
   const idParam = searchParams.get("id");
+
+  // Stream logs sequentially to EOC console panel
+  useEffect(() => {
+    if (logQueue.length === 0) return;
+
+    const intervalTime = Math.max(250, 1500 / speedMultiplier);
+    const timer = setTimeout(() => {
+      const nextLog = logQueue[0];
+      setLogs(prev => [...prev, nextLog]);
+      setLogQueue(prev => prev.slice(1));
+    }, intervalTime);
+
+    return () => clearTimeout(timer);
+  }, [logQueue, speedMultiplier]);
+
+  const queueLogs = (newLogs: LogEntry[]) => {
+    setLogQueue(prev => [...prev, ...newLogs]);
+  };
 
   const refreshSimulationData = async () => {
     if (!idParam) return;
     try {
       const token = localStorage.getItem("token") || "";
-      const res = await fetch(`http://localhost:8000/api/v1/simulations/${idParam}`, {
+      const res = await fetch(`http://127.0.0.1:8000/api/v1/simulations/${idParam}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        router.replace("/login");
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         setSimName(data.name);
@@ -58,8 +84,7 @@ function SimulationPageContent() {
   };
 
   const { isConnected } = useSimulationWebSocket(simId, (msg) => {
-    setLogs(prev => [
-      ...prev,
+    queueLogs([
       {
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         message: `[TELEMETRY STREAM]: Broadcast event received: ${msg.type}`,
@@ -72,8 +97,7 @@ function SimulationPageContent() {
       const targetHour = hoursMap[stepIdx] || 0;
       setCurrentHour(targetHour);
       setActiveStepData(msg.data);
-      const stepLogs = getStepLogs(targetHour);
-      setLogs(prev => [...prev, ...stepLogs]);
+      queueLogs(getStepLogs(targetHour));
     }
     refreshSimulationData();
   });
@@ -82,11 +106,30 @@ function SimulationPageContent() {
     if (!simId) return;
     try {
       const token = localStorage.getItem("token") || "";
-      const res = await fetch(`http://localhost:8000/api/v1/simulations/${simId}/progress`, {
+      const res = await fetch(`http://127.0.0.1:8000/api/v1/simulations/${simId}/progress`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (!res.ok) {
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        router.replace("/login");
+        return;
+      }
+      if (res.ok) {
+        const updatedSim = await res.json();
+        const nextStepIdx = updatedSim.currentStep;
+        const hoursMap = [0, 6, 12, 24, 48];
+        const targetHour = hoursMap[nextStepIdx] || 0;
+        
+        setCurrentHour(targetHour);
+        setStatus(updatedSim.status);
+        
+        const latestStepData = updatedSim.timesteps?.find((t: any) => t.step === nextStepIdx);
+        if (latestStepData) {
+          setActiveStepData(latestStepData);
+          queueLogs(getStepLogs(targetHour));
+        }
+      } else {
         setIsPlaying(false);
       }
     } catch {
@@ -94,7 +137,18 @@ function SimulationPageContent() {
       const currentIndex = hours.indexOf(currentHour);
       if (currentIndex < hours.length - 1) {
         const nextHour = hours[currentIndex + 1];
-        handleStep(nextHour);
+        setCurrentHour(nextHour);
+        queueLogs(getStepLogs(nextHour));
+        
+        const stepIdx = nextHour === 0 ? 0 : nextHour === 6 ? 1 : nextHour === 12 ? 2 : nextHour === 24 ? 3 : 4;
+        setActiveStepData({
+          step: stepIdx,
+          metrics: {
+            activeCasualties: nextHour === 0 ? 12 : nextHour === 6 ? 24 : nextHour === 12 ? 45 : nextHour === 24 ? 120 : 180,
+            displacedPopulation: nextHour === 0 ? 450 : nextHour === 6 ? 1200 : nextHour === 12 ? 3500 : nextHour === 24 ? 14000 : 25000,
+            structuralDamagePercentage: nextHour === 0 ? 1.5 : nextHour === 6 ? 12.0 : nextHour === 12 ? 34.5 : nextHour === 24 ? 65.0 : 85.0
+          }
+        });
       } else {
         setIsPlaying(false);
       }
@@ -107,13 +161,30 @@ function SimulationPageContent() {
       const fetchSimDetails = async () => {
         try {
           const token = localStorage.getItem("token") || "";
-          const res = await fetch(`http://localhost:8000/api/v1/simulations/${idParam}`, {
+          const res = await fetch(`http://127.0.0.1:8000/api/v1/simulations/${idParam}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           if (res.ok) {
             const data = await res.json();
             setSimName(data.name);
             setStatus(data.status);
+            
+            const latestStepIdx = data.currentStep ?? 0;
+            const hoursMap = [0, 6, 12, 24, 48];
+            const targetHour = hoursMap[latestStepIdx] || 0;
+            setCurrentHour(targetHour);
+            
+            const latestStepData = data.timesteps?.find((t: any) => t.step === latestStepIdx);
+            if (latestStepData) {
+              setActiveStepData(latestStepData);
+            }
+            
+            if (data.status === "Running") {
+              setIsPlaying(true);
+            } else {
+              setIsPlaying(false);
+            }
+
             setLogs(prev => [
               ...prev,
               { time: "SYSTEM", message: `LOADED: Cloned simulation run configuration [${data.name}].`, type: "success" }
@@ -139,13 +210,18 @@ function SimulationPageContent() {
 
     try {
       const token = localStorage.getItem("token") || "";
-      const res = await fetch(`http://localhost:8000/api/v1/simulations/${simId}/${action}`, {
+      const res = await fetch(`http://127.0.0.1:8000/api/v1/simulations/${simId}/${action}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
         setStatus(data.status);
+        if (data.status === "Running") {
+          setIsPlaying(true);
+        } else {
+          setIsPlaying(false);
+        }
         setLogs(prev => [
           ...prev,
           { time: "SYSTEM", message: `ACTION TRIGGERED: State transitioned to ${data.status}`, type: "success" }
@@ -264,6 +340,7 @@ function SimulationPageContent() {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isPlaying) {
+      const stepDuration = Math.max(500, 10000 / speedMultiplier);
       timer = setInterval(() => {
         if (simId && status === "Running") {
           triggerProgress();
@@ -272,15 +349,26 @@ function SimulationPageContent() {
           const currentIndex = hours.indexOf(currentHour);
           if (currentIndex < hours.length - 1) {
             const nextHour = hours[currentIndex + 1];
-            handleStep(nextHour);
+            setCurrentHour(nextHour);
+            queueLogs(getStepLogs(nextHour));
+            
+            const stepIdx = nextHour === 0 ? 0 : nextHour === 6 ? 1 : nextHour === 12 ? 2 : nextHour === 24 ? 3 : 4;
+            setActiveStepData({
+              step: stepIdx,
+              metrics: {
+                activeCasualties: nextHour === 0 ? 12 : nextHour === 6 ? 24 : nextHour === 12 ? 45 : nextHour === 24 ? 120 : 180,
+                displacedPopulation: nextHour === 0 ? 450 : nextHour === 6 ? 1200 : nextHour === 12 ? 3500 : nextHour === 24 ? 14000 : 25000,
+                structuralDamagePercentage: nextHour === 0 ? 1.5 : nextHour === 6 ? 12.0 : nextHour === 12 ? 34.5 : nextHour === 24 ? 65.0 : 85.0
+              }
+            });
           } else {
             setIsPlaying(false);
           }
         }
-      }, 3500);
+      }, stepDuration);
     }
     return () => clearInterval(timer);
-  }, [isPlaying, currentHour, simId, status]);
+  }, [isPlaying, currentHour, simId, status, speedMultiplier]);
 
   const [activeStepData, setActiveStepData] = useState<any>(null);
 
@@ -296,7 +384,7 @@ function SimulationPageContent() {
       const stepIdx = hour === 0 ? 0 : hour === 6 ? 1 : hour === 12 ? 2 : hour === 24 ? 3 : 4;
       try {
         const token = localStorage.getItem("token") || "";
-        const res = await fetch(`http://localhost:8000/api/v1/simulations/${simId}/steps/${stepIdx}`, {
+        const res = await fetch(`http://127.0.0.1:8000/api/v1/simulations/${simId}/steps/${stepIdx}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) {
@@ -386,6 +474,16 @@ function SimulationPageContent() {
           <div className="flex items-center justify-between border-b border-border-custom pb-4">
             <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Control Interface</span>
             <div className="flex items-center gap-2">
+              {(status === "Running" || status === "Paused") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-[10px] font-mono border-border-custom hover:bg-bg-primary/50 text-text-secondary hover:text-text-primary transition duration-200"
+                  onClick={() => setSpeedMultiplier(prev => prev === 1 ? 2 : prev === 2 ? 5 : prev === 5 ? 10 : 1)}
+                >
+                  Speed: {speedMultiplier}x
+                </Button>
+              )}
               {simId ? (
                 <>
                   {(status === "Created" || status === "Initialized") && (

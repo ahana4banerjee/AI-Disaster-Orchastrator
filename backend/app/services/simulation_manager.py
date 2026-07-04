@@ -149,13 +149,17 @@ class SimulationManager:
                 "infrastructureStates": new_infra
             }
 
+        set_data = {
+            "currentStep": next_step,
+            "updatedAt": datetime.utcnow()
+        }
+        if next_step == 4:
+            set_data["status"] = "Completed"
+
         await db.simulations.update_one(
             {"_id": sim_oid},
             {
-                "$set": {
-                    "currentStep": next_step,
-                    "updatedAt": datetime.utcnow()
-                },
+                "$set": set_data,
                 "$push": {
                     "timesteps": next_step_doc
                 }
