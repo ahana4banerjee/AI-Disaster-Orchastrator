@@ -745,6 +745,100 @@ function SimulationPageContent() {
             </div>
           </div>
 
+          {/* Healthcare Capacity & Casualty Tracker */}
+          <div className="bg-bg-primary/50 border border-border-custom rounded-xl p-4 space-y-4 select-none">
+            <div className="flex items-center justify-between border-b border-border-custom pb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-text-primary flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${currentHour >= 24 ? "bg-severity-extreme" : "bg-accent-secondary"}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${currentHour >= 24 ? "bg-severity-extreme" : "bg-accent-secondary"}`}></span>
+                </span>
+                Healthcare System Load & Casualty Progression
+              </span>
+              <span className="text-[9px] font-mono text-text-secondary uppercase">
+                {currentHour >= 24 ? "Alert: System Overload" : "Bed capacity normal"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Hospital Bed Occupancy Progress Tracker */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-text-primary">Evacuation Bed Occupancy</span>
+                  <span className={`font-mono font-bold ${
+                    currentHour >= 24 ? "text-severity-extreme animate-pulse" : currentHour >= 12 ? "text-severity-moderate" : "text-severity-low"
+                  }`}>
+                    {currentHour === 0 ? "34%" : currentHour === 6 ? "52%" : currentHour === 12 ? "78%" : "98% (Critical)"}
+                  </span>
+                </div>
+                {/* Progress bar container */}
+                <div className="h-3 bg-bg-secondary rounded-full border border-border-custom overflow-hidden relative">
+                  <div 
+                    className={`h-full transition-all duration-500 rounded-full ${
+                      currentHour >= 24 
+                        ? "bg-severity-extreme" 
+                        : currentHour >= 12 
+                        ? "bg-severity-moderate" 
+                        : "bg-severity-low"
+                    }`}
+                    style={{
+                      width: `${
+                        currentHour === 0 ? "34%" :
+                        currentHour === 6 ? "52%" :
+                        currentHour === 12 ? "78%" : "98%"
+                      }`
+                    }}
+                  />
+                </div>
+                <p className="text-[10px] text-text-secondary leading-normal">
+                  {currentHour >= 24 
+                    ? "Critical bed overflow detected. Hospital triage tents active. Secondary deaths multiplier (+15%) triggered."
+                    : currentHour >= 12 
+                    ? "Surge admissions warning active. Beds operating at high stress levels."
+                    : "Standard admission surges. Capacity remains stable."
+                  }
+                </p>
+              </div>
+
+              {/* Casualty Progression CSS Bar Chart */}
+              <div className="space-y-3">
+                <span className="text-[9px] uppercase tracking-wider text-text-secondary block font-bold">Casualties Growth Curve</span>
+                <div className="h-[60px] flex items-end justify-between gap-2 border-b border-border-custom pb-1 px-1">
+                  {/* Hour 0 Bar */}
+                  <div className="flex-1 flex flex-col items-center gap-1 group">
+                    <div className="text-[8px] font-mono text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity duration-200">1x</div>
+                    <div className="w-full bg-severity-low/40 border border-severity-low/30 rounded-t-sm h-[15px] group-hover:bg-severity-low/60 transition-all duration-300" />
+                    <span className="text-[7px] font-mono text-text-muted mt-1">H0</span>
+                  </div>
+                  {/* Hour 6 Bar */}
+                  <div className="flex-1 flex flex-col items-center gap-1 group">
+                    <div className="text-[8px] font-mono text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity duration-200">1.12x</div>
+                    <div className={`w-full rounded-t-sm transition-all duration-300 h-[22px] ${
+                      currentHour >= 6 ? "bg-severity-moderate/40 border border-severity-moderate/30" : "bg-bg-secondary/40 border border-border-custom"
+                    }`} />
+                    <span className="text-[7px] font-mono text-text-muted mt-1">H6</span>
+                  </div>
+                  {/* Hour 12 Bar */}
+                  <div className="flex-1 flex flex-col items-center gap-1 group">
+                    <div className="text-[8px] font-mono text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity duration-200">1.25x</div>
+                    <div className={`w-full rounded-t-sm transition-all duration-300 h-[35px] ${
+                      currentHour >= 12 ? "bg-severity-extreme/40 border border-severity-extreme/30" : "bg-bg-secondary/40 border border-border-custom"
+                    }`} />
+                    <span className="text-[7px] font-mono text-text-muted mt-1">H12</span>
+                  </div>
+                  {/* Hour 24 Bar */}
+                  <div className="flex-1 flex flex-col items-center gap-1 group">
+                    <div className="text-[8px] font-mono text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity duration-200">1.45x</div>
+                    <div className={`w-full rounded-t-sm transition-all duration-300 h-[50px] ${
+                      currentHour >= 24 ? "bg-severity-extreme/70 border border-severity-extreme/50 animate-pulse" : "bg-bg-secondary/40 border border-border-custom"
+                    }`} />
+                    <span className="text-[7px] font-mono text-text-muted mt-1">H24</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {simId && (
             <div className="grid grid-cols-3 gap-4 border-t border-border-custom pt-4 select-none">
               <div className="p-3 bg-bg-primary/50 border border-border-custom rounded-xl space-y-1">

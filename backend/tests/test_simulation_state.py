@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from bson import ObjectId
 from fastapi.testclient import TestClient
 from app.main import app
@@ -205,6 +205,79 @@ class TestSimulationStateAPI(unittest.TestCase):
         self.mock_db.scenarios.find_one = AsyncMock(return_value=mock_scenario)
         self.mock_db.disasters.find_one = AsyncMock(return_value={"subregion": "Southern Asia"})
         self.mock_db.regional_risk_clusters.find_one = AsyncMock(return_value={"riskTier": "High"})
+        self.mock_db.simulations.update_one = AsyncMock(return_value=None)
+        self.mock_db.admin_audit_logs.insert_one = AsyncMock(return_value=None)
+
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        response = self.client.post("/api/v1/simulations/60a4f5f5f5f5f5f5f5f5f504/progress", headers=headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(self.mock_db.simulations.update_one.called)
+
+    @patch("httpx.AsyncClient.post")
+    def test_progress_simulation_step_3_success(self, mock_post):
+        from datetime import datetime
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "severityClass": "Severe",
+            "impactMetrics": {
+                "expectedDeaths": 50,
+                "expectedTotalAffected": 5000,
+                "expectedDamageUSD": 100000.0
+            }
+        }
+        
+        async def mock_post_async(*args, **kwargs):
+            return mock_resp
+        mock_post.side_effect = mock_post_async
+
+        self.mock_db.users.find_one = AsyncMock(return_value={
+            "_id": ObjectId("60a4f5f5f5f5f5f5f5f5f500"),
+            "email": "admin@earth.org",
+            "role": "admin"
+        })
+        
+        mock_sim = {
+            "_id": ObjectId("60a4f5f5f5f5f5f5f5f5f504"),
+            "scenarioId": ObjectId("60a4f5f5f5f5f5f5f5f5f503"),
+            "name": "Storm Simulation Alpha",
+            "createdBy": "60a4f5f5f5f5f5f5f5f5f500",
+            "status": "Running",
+            "createdAt": datetime.utcnow(),
+            "currentStep": 2,
+            "timesteps": [
+                {"step": 0, "timeLabel": "Hour 0: Landfall", "status": "Active", "metrics": {}, "infrastructureStates": []},
+                {"step": 1, "timeLabel": "Hour 6: Primary Grid Cascades", "status": "Active", "metrics": {}, "infrastructureStates": []},
+                {
+                    "step": 2,
+                    "timeLabel": "Hour 12: Transportation Corridors",
+                    "status": "Active",
+                    "metrics": {
+                        "activeCasualties": 14,
+                        "displacedPopulation": 1200,
+                        "structuralDamagePercentage": 14.0
+                    },
+                    "infrastructureStates": [
+                        {"name": "Power Grid", "status": "Failed", "color": "extreme", "details": ""},
+                        {"name": "Road Network", "status": "Failed", "color": "extreme", "details": ""},
+                        {"name": "Hospitals", "status": "Operational", "color": "emerald", "details": ""},
+                        {"name": "Water Supply", "status": "Operational", "color": "emerald", "details": ""},
+                        {"name": "Telecommunications", "status": "Operational", "color": "emerald", "details": ""},
+                        {"name": "Fuel Supply", "status": "Operational", "color": "emerald", "details": ""}
+                    ]
+                }
+            ]
+        }
+        mock_scenario = {
+            "_id": ObjectId("60a4f5f5f5f5f5f5f5f5f503"),
+            "disasterType": "Storm",
+            "magnitude": 80.0,
+            "country": "India",
+            "iso": "IND"
+        }
+        
+        self.mock_db.simulations.find_one = AsyncMock(side_effect=[mock_sim, mock_sim])
+        self.mock_db.scenarios.find_one = AsyncMock(return_value=mock_scenario)
         self.mock_db.simulations.update_one = AsyncMock(return_value=None)
         self.mock_db.admin_audit_logs.insert_one = AsyncMock(return_value=None)
 

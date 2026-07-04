@@ -122,12 +122,14 @@ async def run_predict(payload: dict):
         
         impacts = clf.predict_impacts(X_trans)
         
+        health_mult = float(payload.get("healthStressMultiplier", 1.0))
+        
         # Generate final response
         return {
             "severityClass": pred_class,
             "impactMetrics": {
-                "expectedDeaths": int(round(impacts["deaths"][0])),
-                "expectedTotalAffected": int(round(impacts["affected"][0])),
+                "expectedDeaths": int(round(impacts["deaths"][0] * health_mult)),
+                "expectedTotalAffected": int(round(impacts["affected"][0] * health_mult)),
                 "expectedDamageUSD": float(impacts["damage"][0])
             },
             "confidenceScore": 0.85,

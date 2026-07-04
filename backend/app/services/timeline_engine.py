@@ -222,3 +222,87 @@ class TimelineEngine:
             },
             "infrastructureStates": new_infra
         }
+
+    @staticmethod
+    async def run_step_3(scenario: dict, previous_step_doc: dict) -> dict:
+        prev_metrics = previous_step_doc.get("metrics", {})
+        prev_infra = previous_step_doc.get("infrastructureStates", [])
+
+        # Clone and process standard cascades
+        from app.services.cascade_engine import CascadeRulesEngine, InfrastructureStateEngine
+        new_infra = CascadeRulesEngine.process_cascades(prev_infra, hours_elapsed=24)
+
+        # 1. Cascade Rule: Power Grid Failed + Road Network Failed -> Hospital Overload (Critical status)
+        power_failed = any(item for item in new_infra if item["name"] == "Power Grid" and item["status"] in ["Failed", "Critical"])
+        road_failed = any(item for item in new_infra if item["name"] == "Road Network" and item["status"] in ["Failed", "Critical"])
+        
+        hospitals = next((item for item in new_infra if item["name"] == "Hospitals"), None)
+        hospital_overloaded = False
+        if hospitals:
+            if power_failed and road_failed:
+                hospitals["status"] = "Critical"
+                hospitals["details"] = "Hospital Overload: Emergency backup power struggling; logistics supply blocks preventing staff surge relief."
+                hospital_overloaded = True
+
+        # Sync color codes
+        for item in new_infra:
+            item["color"] = InfrastructureStateEngine.get_color(item["status"])
+
+        # 2. Casualty Multiplier: Hospital Overload -> Increase expected deaths metrics by +15%
+        health_mult = 1.15 if hospital_overloaded else 1.00
+
+        # ML Integration: Recalculate expected casualty outcomes, integrating health stress parameters into ML inference pipeline
+        predict_payload = {
+            "disasterType": scenario.get("disasterType", "Storm"),
+            "disasterSubtype": scenario.get("disasterSubtype", ""),
+            "country": scenario.get("country", ""),
+            "region": scenario.get("region", ""),
+            "magnitude": scenario.get("magnitude", 0.0),
+            "startMonth": 6,
+            "healthStressMultiplier": health_mult
+        }
+        
+        predictions = {}
+        import httpx
+        from app.core.config import settings
+        try:
+            async with httpx.AsyncClient() as client:
+                p_resp = await client.post(
+                    f"{settings.ML_SERVICE_URL}/predict/",
+                    json=predict_payload,
+                    timeout=5.0
+                )
+                if p_resp.status_code == 200:
+                    predictions = p_resp.json()
+        except Exception:
+            pass
+
+        prev_deaths = prev_metrics.get("activeCasualties", 10)
+        prev_affected = prev_metrics.get("displacedPopulation", 1000)
+        prev_damage = prev_metrics.get("structuralDamagePercentage", 5.0)
+
+        if predictions and "impactMetrics" in predictions:
+            metrics = predictions["impactMetrics"]
+            ml_deaths = int(metrics.get("expectedDeaths", 5))
+            ml_affected = int(metrics.get("expectedTotalAffected", 1000))
+            
+            new_deaths = prev_deaths + int(ml_deaths * 0.20 * health_mult)
+            new_affected = prev_affected + int(ml_affected * 0.15 * health_mult)
+            new_damage = min(100.0, prev_damage + 5.0)
+        else:
+            new_deaths = prev_deaths + int(prev_deaths * 0.20 * health_mult)
+            new_affected = prev_affected + int(prev_affected * 0.12 * health_mult)
+            new_damage = min(100.0, prev_damage + (7.5 * health_mult))
+
+        return {
+            "step": 3,
+            "timeLabel": "Hour 24: Healthcare Stress",
+            "status": "Active",
+            "narrative": "Hour 24: Extreme overload detected at healthcare facilities. Grid blockages and road closures have triggered critical capacity overflow at local hospitals.",
+            "metrics": {
+                "activeCasualties": max(1, new_deaths),
+                "displacedPopulation": max(10, new_affected),
+                "structuralDamagePercentage": round(new_damage, 2)
+            },
+            "infrastructureStates": new_infra
+        }
