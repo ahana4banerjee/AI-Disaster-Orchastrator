@@ -123,7 +123,7 @@ We follow a progressive roadmap containing clear exit milestones:
 * [x] **Phase 3: Core API & Admin Portal Basics** (FastAPI setup, Next.js routing layouts, basic dashboard tables)
 * [x] **Phase 4: Public Portal & Readiness Checker** (Personal Risk Checker, Preparedness Assistant, Family Planner, Readiness Scores, EOC AI Chatbot)
 * [x] **Phase 5: Scenario Template Engine** (Comparing saved simulations side-by-side)
-* [ ] **Phase 6: Asynchronous Simulation Engine** (Cascading step event loop, WebSocket streams)
+* [/] **Phase 6: Asynchronous Simulation Engine** (First half completed: Database setup, setup wizard, Control Manager state machines, temporal progressions, WebSocket registry gateway, infrastructure cascades, SVG transit maps, healthcare trackers, and KNN recovery forecasts)
 * [ ] **Phase 7: AI Situation Report & Exports** (Markdown compilers, PDF rendering streams)
 * [ ] **Phase 8: Deployment & Optimization** (Docker Compose cluster, Redis cache checks)
 

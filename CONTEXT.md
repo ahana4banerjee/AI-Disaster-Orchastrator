@@ -199,6 +199,10 @@ We ran python execution pipelines on the raw CSV and established the following p
 | **Print CSS Columns Collapsing** | Media queries in print mode collapsed footer grids into vertical lists. | Enforced horizontal grid columns (`grid-template-columns: repeat(4, 1fr)`) and pinned the footer to the bottom of the page in the print stylesheet. |
 | **Audit Logs Mocking Errors** | Pre-existing unit tests posted scenarios without mocking `db.audit_logs` collections, causing `TypeError: object MagicMock can't be used in 'await' expression` database write errors. | Wrapped `db.audit_logs.insert_one` calls in fallback try/except TypeError blocks to handle un-mocked mocks gracefully. |
 | **Mock DB Find Method Chaining** | Paginated lists queries chain `.sort().skip().limit()`, which returned raw MagicMocks failing `.to_list()` awaits in unit tests. | Configured mock database cursors `.sort()`, `.skip()`, and `.limit()` return values to return the cursor mock itself. |
+| **Dual-Redundant Playback Loop** | Next.js EOC dashboard progress loop blocked and failed to advance slider if WebSocket disconnected or lagged. | Implemented a dual-redundant state progression trigger. The client runs fetches directly to REST endpoints `/progress` and immediately updates step parameters on-screen, bypassing WebSocket dependencies for core operations. Set default playback speed to 10 seconds with `1x`, `2x`, `5x`, `10x` multiplier controls. |
+| **IPv6 Resolution Latencies** | Node's dns stack resolves `localhost` to IPv6 `::1`, which was blocked by the Windows backend, causing 400 Bad Request errors. | Pointed Next.js and client fetches directly to IPv4 loopback `127.0.0.1:8000`. |
+| **SVG Corridor Access Flow Maps** | Standard static dashboards fail to show spatial blockade progression during simulations. | Built custom Next.js SVG map canvas showing routing links between supply node terminals. The map updates dynamically at Hour 12 to show blocked routes. |
+| **KNN Recovery & Health Stress Feedbacks** | Simple state simulations fail to feedback health strain back into ML models or forecast recovery timelines. | Mapped KM-Means regional risk clusters to scale metrics. Hospital overload at Hour 24 feeds a $+15\%$ casualty factor back to the GBDT ML prediction pipeline, and Hour 48 queries historical KNN analogs to output estimated restoration days. |
 
 ---
 
@@ -217,10 +221,19 @@ When implementing the roadmap, proceed sequentially by reading the current phase
 ### How to trigger next steps:
 * To start the real-time cascading simulation progression engine, prompt: **"Start Phase 6"**.
 
-### Phase 6: Asynchronous Simulation Engine Execution Guide (What to do next)
-1. **Simulation State Collection**: Define MongoDB collection schema to track simulation details, active timesteps, active resource plans, and logs.
-2. **Temporal Step Event Loop**: Implement endpoint `POST /api/v1/simulations/{id}/step` to advance the simulation state by one timestep, checking cascading triggers (e.g. road grid floods -> delays ambulance response).
-3. **WebSockets Server Stream**: Mount real-time broadcast connections at `/api/v1/simulations/{id}/ws` pushing active status updates to administrative map dashboards.
+### Phase 6: Asynchronous Simulation Engine (First Half Implemented)
+* **Completed Scaffolding**:
+  * MongoDB schema indexing and schemas for simulation tracking.
+  * Simulation control manager for start/pause/resume/cancel state transitions.
+  * Chronological timesteps pipeline: Hour 0 (GBDT landfall), Hour 6 (utility grid decay), Hour 12 (road roadblocks & supply line failures), Hour 24 (hospital triage & health stress multipliers), and Hour 48 (KNN analogue restoration estimations).
+  * SVG access map overlays, dynamic bed occupancy progress trackers, and CSS casualty growth charts.
+  * Dual-redundant client execution bypasses ensuring REST progression synchronizes with active states independent of WebSockets.
+  * Core WebSocket gateway heartbeats & reconnection handling.
+* **Remaining Milestones (Second Half)**:
+  1. **Real-time Playback Dashboard Page (`/admin/simulation/live`)**: Create a unified active simulation panel sync.
+  2. **EOC Tactical Simulation Logs Panel**: Stream event logs in sequence with adjustable speed sliders.
+  3. **Resource Allocations & Stockpile Deficit Analyzer**: Model relief supplies requirements (medical, rations, shelters) matching predicted severity vectors.
+  4. **Regional Risk comparisons & Map hazard overlays**: Map regional metrics charts.
 
 
 
