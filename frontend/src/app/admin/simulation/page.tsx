@@ -46,6 +46,11 @@ function SimulationPageContent() {
         const data = await res.json();
         setSimName(data.name);
         setStatus(data.status);
+        if (data.status === "Running") {
+          setIsPlaying(true);
+        } else {
+          setIsPlaying(false);
+        }
       }
     } catch {
       // offline fallback

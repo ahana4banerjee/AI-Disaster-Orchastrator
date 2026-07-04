@@ -30,10 +30,12 @@ export function useSimulationWebSocket(
       const token = localStorage.getItem("token") || "";
       const wsUrl = `ws://127.0.0.1:8000/api/v1/simulations/${simulationId}/ws?token=${encodeURIComponent(token)}`;
 
+      console.log(`[useSimulationWebSocket] Automatically initializing telemetry connection to: ${wsUrl}`);
       const socket = new WebSocket(wsUrl);
       socketRef.current = socket;
 
       socket.onopen = () => {
+        console.log(`[useSimulationWebSocket] Telemetry link connected automatically!`);
         setIsConnected(true);
         const pingInterval = setInterval(() => {
           if (socket.readyState === WebSocket.OPEN) {
@@ -46,6 +48,7 @@ export function useSimulationWebSocket(
       socket.onmessage = (event) => {
         try {
           const payload: WebSocketMessage = JSON.parse(event.data);
+          console.log(`[useSimulationWebSocket] Telemetry message received automatically:`, payload);
           if (payload.type === "PONG") {
             return;
           }
