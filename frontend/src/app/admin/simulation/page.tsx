@@ -625,6 +625,126 @@ function SimulationPageContent() {
             </div>
           </div>
 
+          {/* Transit Corridors Visual Map */}
+          <div className="bg-bg-primary/50 border border-border-custom rounded-xl p-4 space-y-3 select-none">
+            <div className="flex items-center justify-between border-b border-border-custom pb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-text-primary flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${currentHour >= 12 ? "bg-severity-extreme" : "bg-emerald-400"}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${currentHour >= 12 ? "bg-severity-extreme" : "bg-emerald-500"}`}></span>
+                </span>
+                Transit Corridor Access Map
+              </span>
+              <span className="text-[9px] font-mono text-text-secondary uppercase">
+                {currentHour >= 12 ? "Alert: Grid Blocked" : "All routes active"}
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+              {/* Map Canvas Schema */}
+              <div className="md:col-span-2 h-[140px] bg-bg-secondary rounded-lg border border-border-custom relative overflow-hidden flex items-center justify-center p-2">
+                {/* SVG Routes Map */}
+                <svg className="w-full h-full text-text-muted" viewBox="0 0 300 120" fill="none">
+                  {/* Grid background dots */}
+                  <pattern id="grid-dots-map" width="12" height="12" patternUnits="userSpaceOnUse">
+                    <circle cx="2" cy="2" r="0.8" fill="rgba(255,255,255,0.06)" />
+                  </pattern>
+                  <rect width="100%" height="100%" fill="url(#grid-dots-map)" />
+
+                  {/* Supply Depot Node */}
+                  <g transform="translate(35, 60)">
+                    <circle r="6" fill="#1e293b" stroke="#64748b" strokeWidth="1.5" />
+                    <circle r="2" fill="#64748b" />
+                    <text y="-10" textAnchor="middle" className="text-[8px] fill-text-secondary font-mono font-bold">DEPOT</text>
+                  </g>
+
+                  {/* Base Camp Hub Node */}
+                  <g transform="translate(150, 25)">
+                    <circle r="6" fill="#1e293b" stroke="#64748b" strokeWidth="1.5" />
+                    <circle r="2" fill="#64748b" />
+                    <text y="-10" textAnchor="middle" className="text-[8px] fill-text-secondary font-mono font-bold">CAMP HUB</text>
+                  </g>
+
+                  {/* Evac Shelter Node */}
+                  <g transform="translate(260, 75)">
+                    <circle r="6" fill="#1e293b" stroke={currentHour >= 12 ? "#f43f5e" : "#10b981"} strokeWidth="1.5" className={currentHour >= 12 ? "animate-pulse" : ""} />
+                    <circle r="2" fill={currentHour >= 12 ? "#f43f5e" : "#10b981"} />
+                    <text y="-10" textAnchor="middle" className="text-[8px] fill-text-secondary font-mono font-bold">SHELTER A</text>
+                  </g>
+
+                  {/* Highway Route 16 Path (Depot -> Camp Hub -> Shelter) */}
+                  <path 
+                    d="M 41 60 L 144 25" 
+                    stroke={currentHour >= 12 ? "#f43f5e" : "#10b981"} 
+                    strokeWidth="2.5" 
+                    strokeDasharray={currentHour < 12 ? "4 2" : "none"}
+                    className={currentHour < 12 ? "animate-dash-flow" : ""}
+                  />
+                  <path 
+                    d="M 156 25 L 254 75" 
+                    stroke={currentHour >= 12 ? "#f43f5e" : "#10b981"} 
+                    strokeWidth="2.5"
+                    strokeDasharray={currentHour < 12 ? "4 2" : "none"}
+                    className={currentHour < 12 ? "animate-dash-flow" : ""}
+                  />
+
+                  {/* Coastal Route 22 (Direct Depot -> Shelter) */}
+                  <path 
+                    d="M 41 60 Q 148 95 254 75" 
+                    stroke={currentHour >= 12 ? "#f43f5e" : currentHour >= 6 ? "#f59e0b" : "#10b981"} 
+                    strokeWidth="2"
+                    strokeDasharray={currentHour === 0 ? "4 2" : "none"}
+                  />
+
+                  {/* Roadblock indicator icons */}
+                  {currentHour >= 6 && (
+                    <g transform="translate(130, 80)">
+                      <polygon points="0,-6 6,4 -6,4" fill="#f59e0b" />
+                      <text y="-10" textAnchor="middle" className="text-[7px] fill-amber-400 font-bold">FLOOD</text>
+                    </g>
+                  )}
+                  {currentHour >= 12 && (
+                    <g transform="translate(90, 42)">
+                      <polygon points="0,-6 6,4 -6,4" fill="#f43f5e" className="animate-pulse" />
+                      <text y="-10" textAnchor="middle" className="text-[7px] fill-rose-500 font-bold">BLOCKED</text>
+                    </g>
+                  )}
+                  {currentHour >= 12 && (
+                    <g transform="translate(205, 50)">
+                      <polygon points="0,-6 6,4 -6,4" fill="#f43f5e" className="animate-pulse" />
+                      <text y="-10" textAnchor="middle" className="text-[7px] fill-rose-500 font-bold">BLOCKED</text>
+                    </g>
+                  )}
+                </svg>
+              </div>
+
+              {/* Status Alert description panel */}
+              <div className="space-y-2">
+                <span className="text-[9px] uppercase tracking-wider text-text-secondary block font-bold">Corridor Status</span>
+                <div className={`p-3 rounded-lg border text-xs space-y-1.5 ${
+                  currentHour >= 12 
+                    ? "bg-severity-extreme/5 border-severity-extreme/20 text-severity-extreme" 
+                    : currentHour >= 6 
+                    ? "bg-severity-moderate/5 border-severity-moderate/20 text-severity-moderate" 
+                    : "bg-emerald-500/5 border-emerald-500/10 text-emerald-400"
+                }`}>
+                  <div className="font-bold flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {currentHour >= 12 ? "Transit Grid Locked" : currentHour >= 6 ? "Corridor Warning" : "Normal Operations"}
+                  </div>
+                  <p className="text-[10px] text-text-secondary leading-normal">
+                    {currentHour >= 12 
+                      ? "Highway 16 & Coastal Route 22 blocked. Heavy inundation and debris have severed logistic paths to evac shelters."
+                      : currentHour >= 6 
+                      ? "Coastal Route 22 degraded by minor water logging. Strategic transport speed limits active."
+                      : "All transport corridors open. Emergency supply drops and evac bus routes operational."
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {simId && (
             <div className="grid grid-cols-3 gap-4 border-t border-border-custom pt-4 select-none">
               <div className="p-3 bg-bg-primary/50 border border-border-custom rounded-xl space-y-1">

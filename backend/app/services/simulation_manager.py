@@ -131,6 +131,8 @@ class SimulationManager:
         
         if next_step == 1:
             next_step_doc = await TimelineEngine.run_step_1(scenario, previous_step_doc)
+        elif next_step == 2:
+            next_step_doc = await TimelineEngine.run_step_2(scenario, previous_step_doc, db)
         else:
             # Fallback/placeholder for steps 2, 3, 4 (implemented in Chunks 8, 9, 10)
             from app.services.cascade_engine import CascadeRulesEngine

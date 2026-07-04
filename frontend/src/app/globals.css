@@ -70,3 +70,15 @@ body {
   padding: 0;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
+
+/* Transit Map Dashed Corridor Flow Animation */
+.animate-dash-flow {
+  stroke-dasharray: 6 3;
+  animation: dash-animation 1.5s linear infinite;
+}
+
+@keyframes dash-animation {
+  to {
+    stroke-dashoffset: -20;
+  }
+}

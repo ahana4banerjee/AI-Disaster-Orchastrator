@@ -126,3 +126,99 @@ class TimelineEngine:
             },
             "infrastructureStates": new_infra
         }
+
+    @staticmethod
+    async def run_step_2(scenario: dict, previous_step_doc: dict, db) -> dict:
+        # ML Integration: query risk cluster based on scenario's subregion
+        iso_code = scenario.get("iso", "")
+        country_name = scenario.get("country", "")
+        subregion = "Southern Asia"  # Default fallback subregion for Odisha / India
+        
+        try:
+            disaster_rec = await db.disasters.find_one({"iso": iso_code})
+            if not disaster_rec and country_name:
+                disaster_rec = await db.disasters.find_one({"country": country_name})
+            if disaster_rec and disaster_rec.get("subregion"):
+                subregion = disaster_rec.get("subregion")
+        except Exception:
+            pass
+
+        logistics_multiplier = 1.0
+        try:
+            cluster_doc = await db.regional_risk_clusters.find_one({"subregion": subregion})
+            if not cluster_doc and subregion:
+                cluster_doc = await db.regional_risk_clusters.find_one(
+                    {"subregion": {"$regex": f"^{subregion}$", "$options": "i"}}
+                )
+            if cluster_doc:
+                tier = cluster_doc.get("riskTier", "Medium")
+                if tier == "High":
+                    logistics_multiplier = 1.30
+                elif tier == "Medium":
+                    logistics_multiplier = 1.15
+                else:
+                    logistics_multiplier = 1.0
+        except Exception:
+            pass
+
+        prev_metrics = previous_step_doc.get("metrics", {})
+        prev_infra = previous_step_doc.get("infrastructureStates", [])
+
+        # Clone and process standard cascades
+        from app.services.cascade_engine import CascadeRulesEngine, InfrastructureStateEngine
+        new_infra = CascadeRulesEngine.process_cascades(prev_infra, hours_elapsed=12)
+
+        # 1. Cascade Rule: Heavy flood levels or cyclone duration >= 12h -> Road Network Failed
+        dtype = scenario.get("disasterType", "Storm").lower()
+        mag = scenario.get("magnitude", 0.0)
+        
+        road_network = next((item for item in new_infra if item["name"] == "Road Network"), None)
+        if road_network:
+            if "flood" in dtype or ("storm" in dtype and mag > 120.0) or (dtype == "storm"):
+                road_network["status"] = "Failed"
+                road_network["details"] = "Critical transportation corridors blocked by high water levels and debris."
+
+        # 2. Cascade Rule: Road Network Failed + Communication Degraded -> Emergency Shelters Degraded (logistics supply routes blocked)
+        telecom_status = next((item for item in new_infra if item["name"] == "Telecommunications"), {}).get("status", "Operational")
+        
+        shelter_status = "Operational"
+        shelter_details = "All emergency evacuation shelters operating with stable logistics lines."
+        
+        if road_network and road_network["status"] in ["Failed", "Critical"] and telecom_status in ["Degraded", "Failed", "Critical"]:
+            shelter_status = "Degraded"
+            shelter_details = "Logistic delivery corridors cut off. Fresh water, food, and medical supplies delayed."
+
+        # Pushing the shelters node to EOC grid
+        new_infra.append({
+            "name": "Emergency Shelters",
+            "status": shelter_status,
+            "color": InfrastructureStateEngine.get_color(shelter_status),
+            "details": shelter_details
+        })
+
+        # Sync color codes
+        for item in new_infra:
+            item["color"] = InfrastructureStateEngine.get_color(item["status"])
+
+        # Calculate step metrics scaled by risk cluster logistics multiplier
+        prev_deaths = prev_metrics.get("activeCasualties", 10)
+        prev_affected = prev_metrics.get("displacedPopulation", 1000)
+        prev_damage = prev_metrics.get("structuralDamagePercentage", 5.0)
+
+        # High logistics strain multiplies displacement and casualty surge
+        new_deaths = prev_deaths + int(prev_deaths * 0.15 * logistics_multiplier)
+        new_affected = prev_affected + int(prev_affected * 0.10 * logistics_multiplier)
+        new_damage = min(100.0, prev_damage + (6.0 * logistics_multiplier))
+
+        return {
+            "step": 2,
+            "timeLabel": "Hour 12: Transportation Corridors",
+            "status": "Active",
+            "narrative": "Hour 12: Transportation arteries have collapsed due to severe local blockages. Evacuation shelters are experiencing logistical shortages as supply lines are cut.",
+            "metrics": {
+                "activeCasualties": max(1, new_deaths),
+                "displacedPopulation": max(10, new_affected),
+                "structuralDamagePercentage": round(new_damage, 2)
+            },
+            "infrastructureStates": new_infra
+        }
