@@ -221,19 +221,18 @@ When implementing the roadmap, proceed sequentially by reading the current phase
 ### How to trigger next steps:
 * To start the real-time cascading simulation progression engine, prompt: **"Start Phase 6"**.
 
-### Phase 6: Asynchronous Simulation Engine (First Half Implemented)
+### Phase 6: Asynchronous Simulation Engine (Completed)
 * **Completed Scaffolding**:
-  * MongoDB schema indexing and schemas for simulation tracking.
-  * Simulation control manager for start/pause/resume/cancel state transitions.
-  * Chronological timesteps pipeline: Hour 0 (GBDT landfall), Hour 6 (utility grid decay), Hour 12 (road roadblocks & supply line failures), Hour 24 (hospital triage & health stress multipliers), and Hour 48 (KNN analogue restoration estimations).
+  * MongoDB schema indexing and schemas for simulation tracking (`simulations`) and resource deficit plans (`resource_plans`).
+  * Simulation control manager (`SimulationManager`) for start/pause/resume/cancel state transitions.
+  * Chronological timesteps pipeline: Hour 0 (GBDT landfall), Hour 6 (utility grid decay), Hour 12 (road blockages & supply line failures), Hour 24 (hospital triage & health stress multipliers), and Hour 48 (KNN analogue restoration estimations).
   * SVG access map overlays, dynamic bed occupancy progress trackers, and CSS casualty growth charts.
   * Dual-redundant client execution bypasses ensuring REST progression synchronizes with active states independent of WebSockets.
-  * Core WebSocket gateway heartbeats & reconnection handling.
-* **Remaining Milestones (Second Half)**:
-  1. **Real-time Playback Dashboard Page (`/admin/simulation/live`)**: Create a unified active simulation panel sync.
-  2. **EOC Tactical Simulation Logs Panel**: Stream event logs in sequence with adjustable speed sliders.
-  3. **Resource Allocations & Stockpile Deficit Analyzer**: Model relief supplies requirements (medical, rations, shelters) matching predicted severity vectors.
-  4. **Regional Risk comparisons & Map hazard overlays**: Map regional metrics charts.
+  * Core WebSocket gateway heartbeats, reconnection handling, and live `RESOURCE_UPDATE` / `RESOURCE_FINALIZED` / `SIMULATION_COMPLETED` broadcasts.
+  * **Resource Recommendation & Deficit Analyzer (`ResourceEngine`)**: Implements `ML_DESIGN.md` Section 15 formulas (`Ambulances`, `Rescue Teams`, `Medical Teams`, `Relief Camps`, `Food Units`) scaled dynamically by infrastructure disruptions (e.g. Road Network Failed +25% ambulance demand, Hospitals Critical +30% medical teams), computing `Deficit = max(Required - Available, 0)` with `EMERALD` / `AMBER` / `CRIMSON` status classifications.
+  * **Resource APIs & Admin UI (`/admin/resources`)**: Full REST endpoints under `/api/v1/resources/simulations/{id}` (plan, deficits, summary, inventory update) and interactive EOC Resource Planning Dashboard with overview cards, shortfall progress bars, timeline analysis (`Hour 0..48`), critical shortage alerts, inventory editor, and consolidated final assessment.
+* **Next Phase**:
+  * **Phase 7: AI Situation Report & Exports**: Compile simulation metrics, cascading logs, and `resource_plans` deficits into Markdown situation reports and downloadable PDFs.
 
 
 

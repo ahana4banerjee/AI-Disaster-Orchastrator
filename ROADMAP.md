@@ -153,18 +153,19 @@ Each phase contains specific goals, dependencies, deliverables, risks, and crite
 
 ---
 
-## Phase 6: Asynchronous Simulation Engine (First Half Implemented)
+## Phase 6: Asynchronous Simulation Engine (Completed)
 
 ### Goals
 * Implement the step-by-step cascading simulator executing temporal progression logic (Hour 0 to Hour 48). [DONE]
 * Establish FastAPI WebSocket endpoints to stream step executions dynamically. [DONE]
 * Build transit SVG map overlays, health stress trackers, and KNN restoration forecasting. [DONE]
-* Connect predicted outputs to the Resource Recommendation Engine, calculating vehicle and supply deficits. [PENDING SECOND HALF]
+* Connect predicted outputs to the Resource Recommendation Engine, calculating vehicle and supply deficits. [DONE]
 
 ### Deliverables
 * **Simulation Core Runner**: `backend/app/services/timeline_engine.py` and `simulation_manager.py` processing cascading multipliers. [DONE]
-* **WebSocket Router**: `/api/v1/simulations/{id}/ws` serving status updates. [DONE]
-* **Resource UI Dashboard**: Progress tracking screens showing status bars (Emerald, Amber, Crimson) for logistics shortfalls. [PENDING SECOND HALF]
+* **Resource Recommendation & Deficit Engine**: `backend/app/services/resource_engine.py`, `backend/app/api/v1/endpoints/resources.py`, and `resource_plans` persistence. [DONE]
+* **WebSocket Router**: `/api/v1/simulations/{id}/ws` serving step and resource deficit updates. [DONE]
+* **Resource UI Dashboard**: `/admin/resources` progress tracking screens showing status bars (Emerald, Amber, Crimson) for logistics shortfalls and timeline evolution. [DONE]
 
 ### Dependencies
 * Successful completion of Phase 5.
