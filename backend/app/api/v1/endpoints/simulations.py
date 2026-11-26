@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query, WebSocket, WebSocketDisconnect
+from typing import Optional
 from bson import ObjectId
 from datetime import datetime
 import asyncio
@@ -6,9 +7,32 @@ from jose import jwt, JWTError
 from app.core.config import settings
 from app.core.database import get_db
 from app.api.v1.endpoints.auth import get_current_admin
-from app.models.schemas.simulation import SimulationCreate, SimulationResponse, SimulationInitResponse
+from app.models.schemas.simulation import SimulationCreate, SimulationResponse, SimulationInitResponse, SimulationListResponse
 
 router = APIRouter()
+
+@router.get("/", response_model=SimulationListResponse)
+async def list_simulations(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    status_filter: Optional[str] = Query(default=None, alias="status"),
+    current_admin: dict = Depends(get_current_admin),
+    db = Depends(get_db)
+):
+    query = {}
+    if status_filter:
+        query["status"] = status_filter
+
+    total_count = await db.simulations.count_documents(query)
+    total_pages = max(1, (total_count + limit - 1) // limit)
+    cursor = db.simulations.find(query).sort("createdAt", -1).skip((page - 1) * limit).limit(limit)
+    sims = await cursor.to_list(length=limit)
+    return {
+        "totalCount": total_count,
+        "page": page,
+        "totalPages": total_pages,
+        "data": sims
+    }
 
 def generate_timestep(step: int, scenario: dict) -> dict:
     mag = scenario.get("magnitude", 0.0)

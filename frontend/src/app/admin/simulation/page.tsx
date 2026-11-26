@@ -460,11 +460,20 @@ function SimulationPageContent() {
             Asynchronous temporal cascading steps, infrastructure outages, and logistical recommendations.
           </p>
         </div>
-        <Link href="/admin/simulation/new">
-          <Button variant="primary" className="h-9 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-            New Simulation Run
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {simId && (
+            <Link href={`/admin/resources?simulationId=${simId}`}>
+              <Button variant="outline" className="h-9 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                Resource Deficits
+              </Button>
+            </Link>
+          )}
+          <Link href="/admin/simulation/new">
+            <Button variant="primary" className="h-9 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+              New Simulation Run
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Main Grid: Controls & Timeline (Left/Center) + Infra (Right) */}

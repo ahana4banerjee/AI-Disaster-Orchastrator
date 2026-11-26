@@ -515,21 +515,66 @@ This document describes the API endpoints, request/response payloads, validation
 * **Authorization**: Verified by sending Access Token parameter in connection request query string (`?token=jwt_string`).
 * **Connection Workflow**:
   * Client connects.
-  * Server starts pushing time-step changes (e.g. step execution progress: Hour 0, Hour 12, Hour 24) sequentially, streaming cascading metrics dynamically.
-* **Server Message Schema**:
+  * Server pushes `TIMESTEP_UPDATE`, `RESOURCE_UPDATE`, `RESOURCE_FINALIZED`, `SIMULATION_COMPLETED`, and `HEARTBEAT` events dynamically.
+* **Server Message Schemas**:
   ```json
   {
     "type": "TIMESTEP_UPDATE",
     "data": {
       "step": 1,
-      "timeLabel": "Hour 12: Inundation",
-      "infrastructureStates": {
-        "powerGrid": "Failed",
-        "transportationRoads": "Blocked"
-      }
+      "timeLabel": "Hour 6: Primary Grid Cascades",
+      "infrastructureStates": []
     }
   }
   ```
+  ```json
+  {
+    "type": "RESOURCE_UPDATE",
+    "data": {
+      "simulationId": "60a4f5f5f5f5f5f5f5f5f504",
+      "step": 2,
+      "hour": 12,
+      "resources": [],
+      "summary": { "totalRequired": 450, "totalAvailable": 300, "totalDeficit": 150, "criticalCount": 1 },
+      "criticalAlerts": []
+    }
+  }
+  ```
+
+### 8.4 List Simulations (Paginated)
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/simulations/`
+* **Authorization**: Bearer Token (Role: `admin`)
+* **Query Parameters**: `page` (default: 1), `limit` (default: 20), `status` (optional)
+
+---
+
+## 8a. Resource Planning & Deficit APIs
+
+### 8a.1 Retrieve Simulation Resource Plan
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/resources/simulations/{simulation_id}`
+* **Authorization**: Bearer Token (Role: `admin`)
+* **Query Parameters**: `step` (optional int `0..4` to inspect a specific timestep)
+* **Response Schema (200 OK)**: Returns `ResourcePlanResponse` with `inventory`, `resources`, `summary`, `criticalAlerts`, `deficitAnalysisSummary`, and `timestepAssessments`.
+
+### 8a.2 Retrieve Simulation Resource Deficits
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/resources/simulations/{simulation_id}/deficits`
+* **Authorization**: Bearer Token (Role: `admin`)
+* **Query Parameters**: `step` (optional int `0..4`)
+
+### 8a.3 Retrieve Consolidated Resource Summary
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/resources/simulations/{simulation_id}/summary`
+* **Authorization**: Bearer Token (Role: `admin`)
+
+### 8a.4 Update Available Resource Inventory
+* **Method**: `PUT`
+* **Endpoint**: `/api/v1/resources/simulations/{simulation_id}/inventory`
+* **Authorization**: Bearer Token (Role: `admin`)
+* **Request Schema**: `{ "ambulances": 35, "rescueTeams": 12, "medicalTeams": 10, "reliefCamps": 15, "foodUnits": 25000 }`
+* **Response Schema (200 OK)**: Recalculated `ResourcePlanResponse` and broadcasts `RESOURCE_UPDATE` over WebSocket.
 
 ---
 

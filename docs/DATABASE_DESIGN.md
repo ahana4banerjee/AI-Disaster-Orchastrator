@@ -310,32 +310,44 @@ Logs estimated response resources, compares values to localized stock levels, an
 ```json
 {
   "_id": { "$oid": "60a4f5f5f5f5f5f5f5f5f505" },
-  "simulationId": { "$oid": "60a4f5f5f5f5f5f5f5f5f504" },
+  "simulationId": "60a4f5f5f5f5f5f5f5f5f504",
+  "simulationName": "Simulation Run - Cyclone Odisha Cat 4",
   "assessmentDate": { "$date": "2026-06-16T22:31:05Z" },
+  "status": "Finalized",
+  "inventory": {
+    "ambulances": 35,
+    "rescueTeams": 12,
+    "medicalTeams": 10,
+    "reliefCamps": 15,
+    "foodUnits": 25000
+  },
   "resources": [
     {
+      "key": "ambulances",
       "type": "Ambulances",
+      "unit": "units",
       "required": 45,
-      "available": 30,
-      "deficit": 15,
-      "status": "Deficit Critical"
-    },
-    {
-      "type": "Relief Camps",
-      "required": 12,
-      "available": 15,
-      "deficit": 0,
-      "status": "Sufficient"
-    },
-    {
-      "type": "Medical Teams",
-      "required": 10,
-      "available": 8,
-      "deficit": 2,
-      "status": "Deficit Low"
+      "available": 35,
+      "deficit": 10,
+      "deficitPercentage": 22.2,
+      "coveragePercentage": 77.8,
+      "status": "Moderate Shortage",
+      "statusColor": "AMBER",
+      "operationalImplication": "Moderate ambulance shortfall; prioritize critical triage routing.",
+      "infrastructureFactor": "Road Network Failed (+25% detour/turnaround demand)"
     }
   ],
-  "deficitAnalysisSummary": "Critical transport constraints due to ambulance shortfalls. Road blockages from step logs intensify these delays."
+  "summary": {
+    "totalRequired": 25072,
+    "totalAvailable": 25072,
+    "totalDeficit": 10,
+    "criticalCount": 0,
+    "moderateCount": 1,
+    "sufficientCount": 4
+  },
+  "criticalAlerts": [],
+  "timestepAssessments": [],
+  "deficitAnalysisSummary": "Moderate transport constraints due to ambulance shortfalls. Road blockages from step logs intensify these delays."
 }
 ```
 

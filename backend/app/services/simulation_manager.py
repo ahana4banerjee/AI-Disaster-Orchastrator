@@ -58,6 +58,32 @@ class SimulationManager:
                         update_data["currentStep"] = 0
                         sim["timesteps"] = update_data["timesteps"]
                         sim["currentStep"] = 0
+                        try:
+                            from app.services.resource_engine import ResourceEngine
+                            res_out = await ResourceEngine.assess_and_persist_step(
+                                db, simulation_id, sim.get("name", "Simulation"), scenario, step_0, is_final=False
+                            )
+                            if res_out:
+                                from app.core.websocket import manager
+                                latest_res = res_out["latestAssessment"]
+                                await manager.broadcast(
+                                    simulation_id,
+                                    {
+                                        "type": "RESOURCE_UPDATE",
+                                        "data": {
+                                            "simulationId": simulation_id,
+                                            "step": latest_res["step"],
+                                            "hour": latest_res["hour"],
+                                            "timeLabel": latest_res["timeLabel"],
+                                            "resources": latest_res["resources"],
+                                            "summary": latest_res["summary"],
+                                            "criticalAlerts": latest_res["criticalAlerts"],
+                                            "deficitAnalysisSummary": latest_res["deficitAnalysisSummary"],
+                                        },
+                                    },
+                                )
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 
@@ -201,5 +227,58 @@ class SimulationManager:
                 }
             }
         )
+
+        # Assess and persist resource requirements & deficits for this timestep
+        try:
+            from app.services.resource_engine import ResourceEngine
+            is_final = next_step == 4
+            res_out = await ResourceEngine.assess_and_persist_step(
+                db, simulation_id, sim.get("name", "Simulation"), scenario, next_step_doc, is_final=is_final
+            )
+            if res_out:
+                latest_res = res_out["latestAssessment"]
+                await manager.broadcast(
+                    simulation_id,
+                    {
+                        "type": "RESOURCE_UPDATE",
+                        "data": {
+                            "simulationId": simulation_id,
+                            "step": latest_res["step"],
+                            "hour": latest_res["hour"],
+                            "timeLabel": latest_res["timeLabel"],
+                            "resources": latest_res["resources"],
+                            "summary": latest_res["summary"],
+                            "criticalAlerts": latest_res["criticalAlerts"],
+                            "deficitAnalysisSummary": latest_res["deficitAnalysisSummary"],
+                        },
+                    },
+                )
+                if is_final:
+                    await manager.broadcast(
+                        simulation_id,
+                        {
+                            "type": "RESOURCE_FINALIZED",
+                            "data": {
+                                "simulationId": simulation_id,
+                                "status": "Finalized",
+                                "summary": res_out["plan"]["summary"],
+                                "deficitAnalysisSummary": res_out["plan"]["deficitAnalysisSummary"],
+                            },
+                        },
+                    )
+        except Exception:
+            pass
+
+        if next_step == 4:
+            await manager.broadcast(
+                simulation_id,
+                {
+                    "type": "SIMULATION_COMPLETED",
+                    "data": {
+                        "simulationId": simulation_id,
+                        "status": "Completed",
+                    },
+                },
+            )
 
         return updated_sim
