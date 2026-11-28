@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, BeforeValidator
 from typing_extensions import Annotated
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 # Helper to automatically cast MongoDB ObjectId to string
@@ -37,9 +37,13 @@ class DashboardKPIResponse(BaseModel):
     highRiskEvents: int
     averageDeaths: float
     averageDamageUSD: float
+    maxDamageUSD: Optional[float] = None
+    totalDamageUSD: Optional[float] = None
+    severityDistribution: Optional[List[Dict[str, Any]]] = None
 
 class TrendResponse(BaseModel):
     year: int
+    label: Optional[str] = None
     eventCount: int
     averageDamageUSD: float
 

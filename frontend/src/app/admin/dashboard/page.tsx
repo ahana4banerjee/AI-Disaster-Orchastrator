@@ -55,24 +55,58 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setMounted(true);
-    
-    // Asynchronous API query to fetch live KPIs if backend is running
+  }, []);
+
+  useEffect(() => {
+    const daysMap: Record<string, number | null> = {
+      "24h": 1,
+      "7d": 7,
+      "30d": 30,
+      "1y": 365,
+      "all": null,
+    };
+    const daysParam = daysMap[timeRange] ?? 30;
+    const querySuffix = daysParam !== null ? `?days=${daysParam}` : "";
+
     const fetchKPIs = async () => {
       try {
         const token = localStorage.getItem("token") || "";
-        const res = await fetch("http://localhost:8000/api/v1/analytics/dashboard", {
+        const res = await fetch(`http://127.0.0.1:8000/api/v1/analytics/dashboard${querySuffix}`, {
           headers: {
             Authorization: `Bearer ${token}`
           }
         });
         if (res.ok) {
           const data = await res.json();
+          const formatUSD = (val: number) => {
+            if (!val || val <= 0) return "$0";
+            if (val >= 1_000_000_000) return `$${(val / 1_000_000_000).toFixed(2)}B`;
+            if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
+            if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}K`;
+            return `$${val.toFixed(0)}`;
+          };
+          const damageMetric =
+            (data.maxDamageUSD && data.maxDamageUSD > 0)
+              ? data.maxDamageUSD
+              : (data.totalDamageUSD && data.totalDamageUSD > 0)
+              ? data.totalDamageUSD
+              : (data.averageDamageUSD || 0);
+          const totalDamageLabel =
+            data.totalDamageUSD && data.totalDamageUSD > 0
+              ? `Cumulative: ${formatUSD(data.totalDamageUSD)}`
+              : daysParam
+              ? `Last ${daysParam}d`
+              : "2000–2026";
+
           setKpiData({
-            totalEvents: { value: data.totalEvents.toLocaleString(), trend: "+8.4%", isUp: true },
-            extremeEvents: { value: data.highRiskEvents.toLocaleString(), trend: "+1.2%", isUp: true },
-            avgFatalities: { value: data.averageDeaths.toFixed(1), trend: "-3.1%", isUp: false },
-            avgDamages: { value: `$${(data.averageDamageUSD / 1000000).toFixed(2)}M`, trend: "+4.2%", isUp: true }
+            totalEvents: { value: data.totalEvents.toLocaleString(), trend: daysParam ? `Last ${daysParam}d` : "2000–2026", isUp: true },
+            extremeEvents: { value: data.highRiskEvents.toLocaleString(), trend: daysParam ? `Last ${daysParam}d` : "2000–2026", isUp: true },
+            avgFatalities: { value: data.averageDeaths.toFixed(1), trend: daysParam ? `Last ${daysParam}d` : "2000–2026", isUp: false },
+            avgDamages: { value: formatUSD(damageMetric), trend: totalDamageLabel, isUp: true }
           });
+          if (data.severityDistribution) {
+            setSeverityDistribution(data.severityDistribution);
+          }
         }
       } catch (err) {
         // Silent catch: Gracefully fall back to pre-populated mock statistics
@@ -82,7 +116,7 @@ export default function AdminDashboard() {
     const fetchTrends = async () => {
       try {
         const token = localStorage.getItem("token") || "";
-        const res = await fetch("http://localhost:8000/api/v1/analytics/trends", {
+        const res = await fetch(`http://127.0.0.1:8000/api/v1/analytics/trends${querySuffix}`, {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -91,11 +125,13 @@ export default function AdminDashboard() {
           const data = await res.json();
           if (data && data.length > 0) {
             const formatted = data.map((item: any) => ({
-              year: item.year.toString(),
+              year: (item.label || item.year).toString(),
               events: item.eventCount,
-              damages: item.averageDamageUSD / 1000000000 // Convert to Billions USD for chart readability
+              damages: Number(((item.averageDamageUSD || 0) / 1000000).toFixed(2)) // Millions USD
             }));
             setTrendData(formatted);
+          } else {
+            setTrendData([]);
           }
         }
       } catch (err) {
@@ -105,7 +141,7 @@ export default function AdminDashboard() {
     
     fetchKPIs();
     fetchTrends();
-  }, []);
+  }, [timeRange]);
 
   // Live feed log timeline EOC items
   const feedItems = [
@@ -153,6 +189,7 @@ export default function AdminDashboard() {
             <option value="7d">Last 7 Days</option>
             <option value="30d">Last 30 Days</option>
             <option value="1y">Last Year</option>
+            <option value="all">All Time (2000–2026)</option>
           </select>
         </div>
       </div>
@@ -238,11 +275,11 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Average Damages */}
+            {/* Peak / Cumulative Damages */}
             <div className="bg-bg-secondary border border-border-custom rounded-2xl p-5 shadow-xs flex flex-col justify-between min-h-[140px]">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                  Avg. Economic Damages
+                  Peak Economic Damage
                 </span>
                 <DollarSign className="h-4.5 w-4.5 text-severity-moderate" />
               </div>

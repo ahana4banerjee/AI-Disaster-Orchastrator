@@ -1,35 +1,72 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
+from datetime import datetime, timedelta, timezone
 from app.core.database import get_db
 from app.models.schemas.analytics import RegionalRiskClusterResponse, DashboardKPIResponse, TrendResponse, SpatialResponse
 from app.api.v1.endpoints.auth import get_current_user
 
 router = APIRouter()
 
+
+async def _get_date_cutoff(db, days: int) -> datetime:
+    anchor = datetime.now(timezone.utc)
+    try:
+        latest = await db.disaster_records.find_one(
+            {"startDate": {"$type": "date"}},
+            sort=[("startDate", -1)],
+        )
+        if latest and isinstance(latest.get("startDate"), datetime):
+            anchor = latest["startDate"]
+            if anchor.tzinfo is None:
+                anchor = anchor.replace(tzinfo=timezone.utc)
+    except (TypeError, Exception):
+        pass
+    return anchor - timedelta(days=days)
+
+
 @router.get("/dashboard", response_model=DashboardKPIResponse)
 async def get_dashboard_kpis(
     country: Optional[str] = None,
+    days: Optional[int] = Query(default=None, ge=1, le=10000, description="Filter records within last N days from latest dataset record"),
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
     """
     Retrieve high-level dashboard KPIs aggregated from disaster records.
-    Supports filtering by country.
+    Supports filtering by country and days window.
     """
     match_stage = {}
     if country:
         match_stage["country"] = {"$regex": f"^{country.strip()}$", "$options": "i"}
+    if days is not None:
+        cutoff = await _get_date_cutoff(db, days)
+        match_stage["startDate"] = {"$gte": cutoff}
         
     pipeline = []
     if match_stage:
         pipeline.append({"$match": match_stage})
         
+    effective_damage_expr = {
+        "$cond": [
+            {"$gt": ["$impact.economicDamageUSD", 0]},
+            "$impact.economicDamageUSD",
+            {
+                "$add": [
+                    {"$multiply": [{"$ifNull": ["$impact.deaths", 0]}, 50000]},
+                    {"$multiply": [{"$ifNull": ["$impact.totalAffected", 0]}, 120]},
+                ]
+            },
+        ]
+    }
+
     pipeline.append({
         "$group": {
             "_id": None,
             "totalEvents": {"$sum": 1},
             "averageDeaths": {"$avg": "$impact.deaths"},
-            "averageDamageUSD": {"$avg": "$impact.economicDamageUSD"},
+            "averageDamageUSD": {"$avg": effective_damage_expr},
+            "maxDamageUSD": {"$max": effective_damage_expr},
+            "totalDamageUSD": {"$sum": effective_damage_expr},
             "highRiskEvents": {
                 "$sum": {
                     "$cond": [
@@ -38,7 +75,11 @@ async def get_dashboard_kpis(
                         0
                     ]
                 }
-            }
+            },
+            "lowCount": {"$sum": {"$cond": [{"$eq": ["$severityClass", "Low"]}, 1, 0]}},
+            "mediumCount": {"$sum": {"$cond": [{"$eq": ["$severityClass", "Medium"]}, 1, 0]}},
+            "highCount": {"$sum": {"$cond": [{"$eq": ["$severityClass", "High"]}, 1, 0]}},
+            "extremeCount": {"$sum": {"$cond": [{"$eq": ["$severityClass", "Extreme"]}, 1, 0]}},
         }
     })
     
@@ -51,7 +92,15 @@ async def get_dashboard_kpis(
                 "totalEvents": 0,
                 "highRiskEvents": 0,
                 "averageDeaths": 0.0,
-                "averageDamageUSD": 0.0
+                "averageDamageUSD": 0.0,
+                "maxDamageUSD": 0.0,
+                "totalDamageUSD": 0.0,
+                "severityDistribution": [
+                    {"name": "Low", "value": 0, "color": "#10B981"},
+                    {"name": "Moderate", "value": 0, "color": "#F59E0B"},
+                    {"name": "High", "value": 0, "color": "#F97316"},
+                    {"name": "Extreme", "value": 0, "color": "#DC2626"},
+                ],
             }
             
         res = results[0]
@@ -59,7 +108,15 @@ async def get_dashboard_kpis(
             "totalEvents": res.get("totalEvents", 0),
             "highRiskEvents": res.get("highRiskEvents", 0),
             "averageDeaths": round(res.get("averageDeaths") or 0.0, 1),
-            "averageDamageUSD": round(res.get("averageDamageUSD") or 0.0, 2)
+            "averageDamageUSD": round(res.get("averageDamageUSD") or 0.0, 2),
+            "maxDamageUSD": round(res.get("maxDamageUSD") or 0.0, 2),
+            "totalDamageUSD": round(res.get("totalDamageUSD") or 0.0, 2),
+            "severityDistribution": [
+                {"name": "Low", "value": res.get("lowCount", 0), "color": "#10B981"},
+                {"name": "Moderate", "value": res.get("mediumCount", 0), "color": "#F59E0B"},
+                {"name": "High", "value": res.get("highCount", 0), "color": "#F97316"},
+                {"name": "Extreme", "value": res.get("extremeCount", 0), "color": "#DC2626"},
+            ],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database aggregation error: {str(e)}")
@@ -67,45 +124,101 @@ async def get_dashboard_kpis(
 @router.get("/trends", response_model=List[TrendResponse])
 async def get_year_wise_trends(
     disasterType: Optional[str] = None,
+    days: Optional[int] = Query(default=None, ge=1, le=10000),
     current_user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
     """
-    Retrieve year-wise disaster trends.
-    Supports filtering by disasterType.
+    Retrieve disaster trends (daily/monthly when days <= 365, year-wise otherwise).
+    Supports filtering by disasterType and days window.
     """
     match_stage = {"startDate": {"$type": "date"}}
     if disasterType:
         match_stage["disasterType"] = {"$regex": f"^{disasterType.strip()}$", "$options": "i"}
-        
-    pipeline = [
-        {"$match": match_stage},
-        {
-            "$group": {
-                "_id": {"$year": "$startDate"},
-                "eventCount": {"$sum": 1},
-                "averageDamageUSD": {"$avg": "$impact.economicDamageUSD"}
-            }
-        },
-        {
-            "$project": {
-                "_id": 0,
-                "year": "$_id",
-                "eventCount": 1,
-                "averageDamageUSD": 1
-            }
-        },
-        {"$sort": {"year": 1}}
-    ]
+    if days is not None:
+        cutoff = await _get_date_cutoff(db, days)
+        match_stage["startDate"] = {"$type": "date", "$gte": cutoff}
+
+    if days is not None and days <= 30:
+        group_id = {
+            "year": {"$year": "$startDate"},
+            "label": {"$dateToString": {"format": "%Y-%m-%d", "date": "$startDate"}},
+        }
+        sort_stage = {"_id.label": 1}
+    elif days is not None and days <= 365:
+        group_id = {
+            "year": {"$year": "$startDate"},
+            "label": {"$dateToString": {"format": "%Y-%m", "date": "$startDate"}},
+        }
+        sort_stage = {"_id.label": 1}
+    else:
+        group_id = {"$year": "$startDate"}
+        sort_stage = {"year": 1}
+
+    effective_damage_expr = {
+        "$cond": [
+            {"$gt": ["$impact.economicDamageUSD", 0]},
+            "$impact.economicDamageUSD",
+            {
+                "$add": [
+                    {"$multiply": [{"$ifNull": ["$impact.deaths", 0]}, 50000]},
+                    {"$multiply": [{"$ifNull": ["$impact.totalAffected", 0]}, 120]},
+                ]
+            },
+        ]
+    }
+
+    if isinstance(group_id, dict):
+        pipeline = [
+            {"$match": match_stage},
+            {
+                "$group": {
+                    "_id": group_id,
+                    "eventCount": {"$sum": 1},
+                    "averageDamageUSD": {"$avg": effective_damage_expr},
+                }
+            },
+            {"$sort": sort_stage},
+            {
+                "$project": {
+                    "_id": 0,
+                    "year": "$_id.year",
+                    "label": "$_id.label",
+                    "eventCount": 1,
+                    "averageDamageUSD": 1,
+                }
+            },
+        ]
+    else:
+        pipeline = [
+            {"$match": match_stage},
+            {
+                "$group": {
+                    "_id": group_id,
+                    "eventCount": {"$sum": 1},
+                    "averageDamageUSD": {"$avg": effective_damage_expr},
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "year": "$_id",
+                    "eventCount": 1,
+                    "averageDamageUSD": 1,
+                }
+            },
+            {"$sort": sort_stage},
+        ]
     
     try:
         cursor = db.disaster_records.aggregate(pipeline)
-        results = await cursor.to_list(length=100)
+        results = await cursor.to_list(length=200)
         
         trends = []
         for r in results:
             trends.append({
                 "year": r["year"],
+                "label": r.get("label") or str(r["year"]),
                 "eventCount": r["eventCount"],
                 "averageDamageUSD": round(r.get("averageDamageUSD") or 0.0, 2)
             })
