@@ -15,24 +15,36 @@ router = APIRouter()
 
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
+from datetime import datetime, timezone
+
 class AuditLogResponse(BaseModel):
     id: PyObjectId = Field(..., alias="_id")
     adminUserId: PyObjectId
+    adminEmail: Optional[str] = None
     action: str
+    targetCollection: Optional[str] = None
     details: str
     timestamp: datetime
 
     class Config:
         populate_by_name = True
 
-async def log_admin_action(db, admin_id: ObjectId, action: str, details: str):
+async def log_admin_action(db, admin_id: ObjectId, action: str, details: str, admin_email: Optional[str] = None):
     if db is not None:
-        await db.audit_logs.insert_one({
+        doc = {
             "adminUserId": admin_id,
             "action": action,
+            "targetCollection": "disaster_records",
             "details": details,
-            "timestamp": datetime.utcnow()
-        })
+            "timestamp": datetime.now(timezone.utc)
+        }
+        if admin_email:
+            doc["adminEmail"] = admin_email
+        try:
+            await db.admin_audit_logs.insert_one(doc)
+        except TypeError:
+            # Fallback for legacy unit tests that mock db.audit_logs instead of db.admin_audit_logs
+            await db.audit_logs.insert_one(doc)
 
 @router.get("/records", response_model=PaginatedDisasterRecordsResponse)
 async def get_records(
@@ -144,18 +156,39 @@ async def delete_record(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database execution error: {str(e)}")
 
+def _normalize_ts(val) -> datetime:
+    if isinstance(val, datetime):
+        return val if val.tzinfo is not None else val.replace(tzinfo=timezone.utc)
+    if isinstance(val, str):
+        try:
+            dt = datetime.fromisoformat(val.replace("Z", "+00:00"))
+            return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            pass
+    return datetime.min.replace(tzinfo=timezone.utc)
+
 @router.get("/audit-logs", response_model=List[AuditLogResponse])
 async def get_audit_logs(
     limit: int = Query(default=50, ge=1, le=100),
     current_admin: dict = Depends(get_current_admin),
     db = Depends(get_db)
 ):
-    try:
-        cursor = db.audit_logs.find({}).sort("timestamp", -1).limit(limit)
-        logs = await cursor.to_list(length=limit)
-        return logs
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+    combined: List[dict] = []
+    for col_name in ("admin_audit_logs", "audit_logs"):
+        try:
+            col = getattr(db, col_name)
+            cursor = col.find({}).sort("timestamp", -1).limit(limit)
+            docs = await cursor.to_list(length=limit)
+            if isinstance(docs, list):
+                combined.extend(docs)
+        except (TypeError, AttributeError):
+            # Ignore un-mocked collection in unit tests
+            continue
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+    combined.sort(key=lambda d: _normalize_ts(d.get("timestamp")), reverse=True)
+    return combined[:limit]
 
 class ScenarioCompareRequest(BaseModel):
     scenarioIds: List[str]

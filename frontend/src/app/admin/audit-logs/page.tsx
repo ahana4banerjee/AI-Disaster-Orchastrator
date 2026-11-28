@@ -1,14 +1,17 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { History, ShieldAlert, CheckCircle, Search } from "lucide-react";
+import { History, ShieldAlert, CheckCircle, RefreshCw } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/Skeleton";
+import { Button } from "@/components/ui/Button";
 
 interface AuditLog {
   id?: string;
   _id?: string;
   adminUserId: string;
+  adminEmail?: string;
   action: string;
+  targetCollection?: string;
   details: string;
   timestamp: string;
   ip?: string;
@@ -32,7 +35,7 @@ export default function AuditLogsPage() {
     setStatusMessage(null);
     try {
       const token = localStorage.getItem("token") || "";
-      const res = await fetch("http://localhost:8000/api/v1/admin/audit-logs", {
+      const res = await fetch("http://127.0.0.1:8000/api/v1/admin/audit-logs?limit=100", {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -75,16 +78,27 @@ export default function AuditLogsPage() {
             Review trace records of operator modifications, simulation executions, and credentials authorization logs.
           </p>
         </div>
-        {statusMessage && (
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-sm border text-[10px] font-mono font-bold select-none ${
-            statusMessage.type === "success" 
-              ? "bg-severity-low/10 text-severity-low border-severity-low/20" 
-              : "bg-accent-purple/10 text-accent-purple border-accent-purple/20"
-          }`}>
-            {statusMessage.type === "success" ? <CheckCircle className="h-3.5 w-3.5" /> : <ShieldAlert className="h-3.5 w-3.5" />}
-            {statusMessage.text.toUpperCase()}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {statusMessage && (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-sm border text-[10px] font-mono font-bold select-none ${
+              statusMessage.type === "success" 
+                ? "bg-severity-low/10 text-severity-low border-severity-low/20" 
+                : "bg-accent-purple/10 text-accent-purple border-accent-purple/20"
+            }`}>
+              {statusMessage.type === "success" ? <CheckCircle className="h-3.5 w-3.5" /> : <ShieldAlert className="h-3.5 w-3.5" />}
+              {statusMessage.text.toUpperCase()}
+            </div>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchLogs}
+            className="h-8 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Audit Log Table Canvas */}
@@ -110,12 +124,12 @@ export default function AuditLogsPage() {
                     className="h-[56px] border-b border-border-custom hover:bg-bg-primary/40 transition duration-100 text-xs text-text-primary font-medium"
                   >
                     <td className="px-5 font-mono text-text-secondary">{formatTimestamp(log.timestamp)}</td>
-                    <td className="px-5 font-mono text-text-primary">{log.adminUserId}</td>
+                    <td className="px-5 font-mono text-text-primary">{log.adminEmail || log.adminUserId}</td>
                     <td className="px-5">
                       <span className={`inline-flex items-center justify-center px-2 py-0.5 border text-[9px] font-bold rounded-sm tracking-wider uppercase ${
                         log.action.includes("DELETE") || log.action.includes("FAILURE")
                           ? "bg-severity-extreme/10 text-severity-extreme border-severity-extreme/20"
-                          : log.action.includes("CREATE") || log.action.includes("COMPILE")
+                          : log.action.includes("CREATE") || log.action.includes("COMPILE") || log.action.includes("GENERATE")
                           ? "bg-severity-low/10 text-severity-low border-severity-low/20"
                           : "bg-accent-primary/10 text-accent-primary border-accent-primary/20"
                       }`}>
