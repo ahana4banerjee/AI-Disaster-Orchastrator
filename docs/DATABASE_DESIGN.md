@@ -454,16 +454,30 @@ Logs decision summaries compiled for authorities, tracking markdown structure de
 ```json
 {
   "_id": { "$oid": "60a4f5f5f5f5f5f5f5f5f508" },
-  "simulationId": { "$oid": "60a4f5f5f5f5f5f5f5f5f504" },
-  "compiledBy": { "$oid": "60a4f5f5f5f5f5f5f5f5f500" },
+  "reportCode": "SITREP-20261128-F504-V01",
+  "version": 1,
+  "simulationId": "60a4f5f5f5f5f5f5f5f5f504",
+  "simulationName": "Cyclone Odisha Cat 4",
+  "simulationStatus": "Completed",
+  "severityClass": "Extreme",
+  "compiledBy": "60a4f5f5f5f5f5f5f5f5f500",
+  "compiledByEmail": "admin@agency.gov",
   "title": "SITREP - Cyclone Odisha Coastal Response Plan",
+  "classification": "UNCLASSIFIED // EOC OFFICIAL BRIEF",
   "sections": {
-    "situationSummary": "Tropical cyclone landfall verified. Primary impacts focused on power infrastructure failure.",
-    "riskAssessment": "Extreme threat level on secondary road corridors due to flooding.",
-    "suggestedActions": "Re-route ambulances from inland clusters to bridge operational deficits."
+    "situationSummary": "...",
+    "riskAssessment": "...",
+    "expectedImpact": "...",
+    "resourceRecommendations": "...",
+    "keyConcerns": "...",
+    "suggestedActions": "..."
   },
-  "pdfStorageUrl": "https://s3.amazonaws.com/ai-disaster-orch/sitreps/2026/odisha_sitrep_60a4f504.pdf",
-  "createdAt": { "$date": "2026-06-16T22:32:00Z" }
+  "snapshot": { "reportCode": "SITREP-20261128-F504-V01", "version": 1, "executedTimesteps": [], "pendingTimesteps": [], "resources": [], "provenance": {} },
+  "markdownContent": "# SITREP - Cyclone Odisha Coastal Response Plan...",
+  "pdfStorageUrl": "/api/v1/reports/60a4f5f5f5f5f5f5f5f5f508/pdf",
+  "markdownUrl": "/api/v1/reports/60a4f5f5f5f5f5f5f5f5f508/markdown",
+  "csvUrl": "/api/v1/reports/60a4f5f5f5f5f5f5f5f5f508/csv",
+  "createdAt": { "$date": "2026-11-28T22:15:00Z" }
 }
 ```
 

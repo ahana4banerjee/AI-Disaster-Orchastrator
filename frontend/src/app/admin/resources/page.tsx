@@ -418,6 +418,15 @@ function ResourcesDashboardContent() {
                   Simulation View
                 </Button>
               </Link>
+              <Link href={`/admin/reports?simulationId=${selectedSimId}`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
+                >
+                  Generate SitRep
+                </Button>
+              </Link>
             </>
           )}
         </div>

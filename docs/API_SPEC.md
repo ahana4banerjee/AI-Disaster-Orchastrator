@@ -580,33 +580,46 @@ This document describes the API endpoints, request/response payloads, validation
 
 ## 9. Reporting APIs
 
-### 9.1 Compile and Generate AI Situation Report
+### 9.1 Compile and Generate AI Situation Report (Immutable Snapshot)
 * **Method**: `POST`
-* **Endpoint**: `/api/v1/reports`
-* **Authorization**: Bearer Token (Role: `admin`)
+* **Endpoint**: `/api/v1/reports/`
+* **Authorization**: Bearer Token (Role: `admin`, shared across all authenticated admins)
 * **Request Schema**:
   ```json
   {
     "simulationId": "60a4f5f5f5f5f5f5f5f5f504",
-    "title": "SITREP - Cyclone Odisha Coastal Response Plan"
-  }
-  ```
-* **Response Schema (201 Created)**:
-  ```json
-  {
-    "id": "60a4f5f5f5f5f5f5f5f5f508",
-    "simulationId": "60a4f5f5f5f5f5f5f5f5f504",
     "title": "SITREP - Cyclone Odisha Coastal Response Plan",
-    "pdfStorageUrl": "https://s3.amazonaws.com/ai-disaster-orch/sitreps/2026/odisha_sitrep_60a4f504.pdf",
-    "createdAt": "2026-06-16T22:32:00Z"
+    "classification": "UNCLASSIFIED // EOC OFFICIAL BRIEF",
+    "authorNotes": "Optional coordinator remarks"
   }
   ```
+* **Response Schema (201 Created)**: Returns `ReportResponse` with `reportCode`, `version`, `simulationStatus`, `severityClass`, `pdfStorageUrl`, `markdownUrl`, `csvUrl`, and `createdAt`. Logs `GENERATE_REPORT` to `admin_audit_logs`.
 
-### 9.2 Stream Compiled Report PDF
+### 9.2 List Compiled Reports (Paginated)
 * **Method**: `GET`
-* **Endpoint**: `/api/v1/reports/{id}/pdf`
+* **Endpoint**: `/api/v1/reports/`
 * **Authorization**: Bearer Token (Role: `admin`)
-* **Response Schema (200 OK - file stream)**: `application/pdf` binary stream.
+* **Query Parameters**: `page`, `limit`, `simulationId` (optional)
+
+### 9.3 Retrieve Single Report Detail & Snapshot
+* **Method**: `GET`
+* **Endpoint**: `/api/v1/reports/{id}`
+* **Authorization**: Bearer Token (Role: `admin`)
+* **Response Schema (200 OK)**: Returns `ReportDetailResponse` including immutable `snapshot` and `markdownContent`.
+
+### 9.4 Stream Compiled Report PDF / Markdown / CSV
+* **Method**: `GET`
+* **Endpoints**:
+  * `/api/v1/reports/{id}/pdf` (`application/pdf` multi-page EOC PDF; logs `DOWNLOAD_REPORT_PDF`)
+  * `/api/v1/reports/{id}/markdown` (`text/markdown` report; logs `DOWNLOAD_REPORT_MARKDOWN`)
+  * `/api/v1/reports/{id}/csv` (`text/csv` structured timelines, infrastructure & resources; logs `DOWNLOAD_REPORT_CSV`)
+* **Authorization**: Bearer Token (Role: `admin`)
+
+### 9.5 Delete Compiled Report
+* **Method**: `DELETE`
+* **Endpoint**: `/api/v1/reports/{id}`
+* **Authorization**: Bearer Token (Role: `admin`)
+* **Response**: `204 No Content` (logs `DELETE_REPORT` to `admin_audit_logs`).
 
 ---
 
