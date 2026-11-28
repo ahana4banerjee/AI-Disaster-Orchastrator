@@ -278,12 +278,24 @@ export default function AdminLayout({
 
             {/* EOC Comms & Activity Side Portal Toggle */}
             <button
-              onClick={() => setCommsOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-custom bg-bg-primary hover:border-accent-primary text-xs font-bold text-text-primary transition cursor-pointer"
+              onClick={() => {
+                setCommsOpen(true);
+                setUnreadCount(0);
+              }}
+              className={`relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border text-xs font-bold transition cursor-pointer shadow-xs ${
+                unreadCount > 0
+                  ? "bg-amber-500 text-slate-950 border-amber-400 hover:bg-amber-400 ring-2 ring-amber-500/40 animate-pulse"
+                  : "bg-accent-primary/15 text-accent-primary border-accent-primary/40 hover:bg-accent-primary hover:text-white"
+              }`}
               title="Open EOC Admin Activity & Communications Side Portal"
             >
-              <MessageSquare className="h-3.5 w-3.5 text-accent-primary" />
+              <MessageSquare className="h-3.5 w-3.5" />
               <span className="text-[10px] uppercase tracking-wider">EOC Comms</span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-mono font-black flex items-center justify-center border border-bg-secondary shadow-xs">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </button>
 
             {/* Theme Toggle Button */}
