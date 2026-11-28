@@ -10,6 +10,7 @@ from app.models.schemas.disaster import DisasterRecordCreate, DisasterRecordResp
 from pydantic import BaseModel, Field, BeforeValidator
 from typing_extensions import Annotated
 from app.services.data_pipeline import DisasterDataPipeline
+from app.services.report_generator import ReportGenerator
 
 router = APIRouter()
 
@@ -189,6 +190,113 @@ async def get_audit_logs(
 
     combined.sort(key=lambda d: _normalize_ts(d.get("timestamp")), reverse=True)
     return combined[:limit]
+
+
+class AdminCommCreate(BaseModel):
+    message: str = Field(..., min_length=1, max_length=1000)
+    category: str = Field(default="Handover", pattern="^(Handover|Directive|Alert|General)$")
+    relatedEntity: Optional[str] = Field(default=None, max_length=100)
+
+
+class AdminCommResponse(BaseModel):
+    id: PyObjectId = Field(..., alias="_id")
+    adminUserId: PyObjectId
+    adminEmail: str
+    message: str
+    category: str
+    relatedEntity: Optional[str] = None
+    createdAt: datetime
+
+    class Config:
+        populate_by_name = True
+
+
+@router.get("/communications", response_model=List[AdminCommResponse])
+async def get_admin_communications(
+    limit: int = Query(default=50, ge=1, le=100),
+    current_admin: dict = Depends(get_current_admin),
+    db=Depends(get_db),
+):
+    try:
+        cursor = db.admin_communications.find({}).sort("createdAt", -1).limit(limit)
+        docs = await cursor.to_list(length=limit)
+        return docs if isinstance(docs, list) else []
+    except (TypeError, AttributeError):
+        return []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+
+@router.post("/communications", response_model=AdminCommResponse, status_code=status.HTTP_201_CREATED)
+async def create_admin_communication(
+    payload: AdminCommCreate,
+    current_admin: dict = Depends(get_current_admin),
+    db=Depends(get_db),
+):
+    clean_msg = ReportGenerator.sanitize_text(payload.message, 1000)
+    if not clean_msg:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    clean_ref = ReportGenerator.sanitize_text(payload.relatedEntity, 100) if payload.relatedEntity else None
+
+    now = datetime.now(timezone.utc)
+    doc = {
+        "adminUserId": current_admin["_id"],
+        "adminEmail": current_admin.get("email", "admin@agency.gov"),
+        "message": clean_msg,
+        "category": payload.category,
+        "relatedEntity": clean_ref,
+        "createdAt": now,
+    }
+    try:
+        result = await db.admin_communications.insert_one(doc)
+        doc["_id"] = result.inserted_id
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database write error: {str(e)}")
+
+    await log_admin_action(
+        db=db,
+        admin_id=current_admin["_id"],
+        action="POST_ADMIN_NOTE",
+        details=f"[{payload.category}] {clean_msg[:120]}",
+        admin_email=current_admin.get("email"),
+    )
+    return doc
+
+
+@router.get("/activity-feed")
+async def get_admin_activity_feed(
+    limit: int = Query(default=30, ge=1, le=100),
+    current_admin: dict = Depends(get_current_admin),
+    db=Depends(get_db),
+):
+    audit_logs = await get_audit_logs(limit=limit, current_admin=current_admin, db=db)
+    comms = await get_admin_communications(limit=limit, current_admin=current_admin, db=db)
+    return {
+        "auditLogs": [
+            {
+                "id": str(item.get("_id", "")),
+                "adminUserId": str(item.get("adminUserId", "")),
+                "adminEmail": item.get("adminEmail"),
+                "action": item.get("action", ""),
+                "targetCollection": item.get("targetCollection"),
+                "details": item.get("details", ""),
+                "timestamp": _normalize_ts(item.get("timestamp")).isoformat(),
+            }
+            for item in audit_logs
+        ],
+        "communications": [
+            {
+                "id": str(item.get("_id", "")),
+                "adminUserId": str(item.get("adminUserId", "")),
+                "adminEmail": item.get("adminEmail", ""),
+                "message": item.get("message", ""),
+                "category": item.get("category", "General"),
+                "relatedEntity": item.get("relatedEntity"),
+                "createdAt": _normalize_ts(item.get("createdAt")).isoformat(),
+            }
+            for item in comms
+        ],
+    }
 
 class ScenarioCompareRequest(BaseModel):
     scenarioIds: List[str]

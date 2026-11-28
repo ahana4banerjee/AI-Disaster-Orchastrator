@@ -378,6 +378,24 @@ Display:
 
 ---
 
+# Module 14: Admin Operations & Communication Side Portal (Phase 7.1)
+
+## Purpose
+
+Provide a persistent, slide-over command-room side portal accessible across every Admin Portal screen so multiple EOC administrators can monitor all system operations in real time and coordinate shift handovers.
+
+## Features
+
+### Live Cross-Admin Activity Feed
+* Aggregates all administrative operations across `admin_audit_logs` and `audit_logs` (simulation runs, resource inventory updates, SitRep compilations/downloads/deletions, scenario edits, and record changes).
+* Displays action badges, operator email/ID, target scope details, and timestamps.
+
+### EOC Shift Handover & Operational Comms
+* Allows authenticated admins to post categorized operational notes (`Handover`, `Directive`, `Alert`, `General`) with optional reference IDs (e.g. `SITREP-20261128-F504-V01`).
+* Persists messages in `admin_communications` and logs `POST_ADMIN_NOTE` to `admin_audit_logs`.
+
+---
+
 # Future Enterprise Features
 
 * Multi-user collaboration

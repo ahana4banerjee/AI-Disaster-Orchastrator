@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
+import { AdminCommsDrawer } from "@/components/ui/AdminCommsDrawer";
 import {
   LayoutDashboard,
   BarChart3,
@@ -21,6 +22,7 @@ import {
   LogOut,
   Sun,
   Moon,
+  MessageSquare,
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -33,6 +35,84 @@ export default function AdminLayout({
   const { theme, toggleTheme } = useTheme();
   const [authorized, setAuthorized] = React.useState(false);
   const [userEmail, setUserEmail] = React.useState("eoc@agency.gov");
+  const [commsOpen, setCommsOpen] = React.useState(false);
+  const [unreadCount, setUnreadCount] = React.useState(0);
+  const lastSeenTsRef = React.useRef<number | null>(null);
+
+  const playNotificationSound = React.useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(660, now);
+      gain1.gain.setValueAtTime(0.08, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.16);
+
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(880, now + 0.12);
+      gain2.gain.setValueAtTime(0.08, now + 0.12);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.12);
+      osc2.stop(now + 0.32);
+    } catch {
+      // Ignore browser autoplay restrictions if user hasn't interacted yet
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!authorized) return;
+
+    const pollActivity = async () => {
+      try {
+        const token = localStorage.getItem("token") || "";
+        const res = await fetch("http://127.0.0.1:8000/api/v1/admin/activity-feed?limit=20", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const timestamps: number[] = [
+          ...(data.auditLogs || []).map((l: any) => new Date(l.timestamp).getTime()),
+          ...(data.communications || []).map((c: any) => new Date(c.createdAt).getTime()),
+        ].filter((t) => !Number.isNaN(t));
+
+        if (timestamps.length === 0) return;
+        const newestTs = Math.max(...timestamps);
+
+        if (lastSeenTsRef.current === null) {
+          lastSeenTsRef.current = newestTs;
+          return;
+        }
+
+        if (newestTs > lastSeenTsRef.current) {
+          const newItemsCount = timestamps.filter((t) => t > (lastSeenTsRef.current ?? 0)).length;
+          lastSeenTsRef.current = newestTs;
+          if (!commsOpen && newItemsCount > 0) {
+            setUnreadCount((prev) => prev + newItemsCount);
+            playNotificationSound();
+          }
+        }
+      } catch {
+        // Ignore transient polling errors
+      }
+    };
+
+    pollActivity();
+    const interval = setInterval(pollActivity, 10000);
+    return () => clearInterval(interval);
+  }, [authorized, commsOpen, playNotificationSound]);
 
   React.useEffect(() => {
     const token = localStorage.getItem("token");
@@ -187,7 +267,7 @@ export default function AdminLayout({
           </div>
 
           {/* Indicators & Theme Toggle */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             {/* Server Connection Status Indicator */}
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 bg-severity-low rounded-full animate-pulse"></span>
@@ -195,6 +275,16 @@ export default function AdminLayout({
                 System Status: Active
               </span>
             </div>
+
+            {/* EOC Comms & Activity Side Portal Toggle */}
+            <button
+              onClick={() => setCommsOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-custom bg-bg-primary hover:border-accent-primary text-xs font-bold text-text-primary transition cursor-pointer"
+              title="Open EOC Admin Activity & Communications Side Portal"
+            >
+              <MessageSquare className="h-3.5 w-3.5 text-accent-primary" />
+              <span className="text-[10px] uppercase tracking-wider">EOC Comms</span>
+            </button>
 
             {/* Theme Toggle Button */}
             <button
@@ -218,6 +308,9 @@ export default function AdminLayout({
           </div>
         </main>
       </div>
+
+      {/* Phase 7.1: Admin Operations & Communication Side Portal */}
+      <AdminCommsDrawer open={commsOpen} onClose={() => setCommsOpen(false)} />
     </div>
   );
 }
