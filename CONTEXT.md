@@ -147,7 +147,7 @@ The directory tree includes the core backend database managers, schemas, loader 
     │   │   │   ├── dashboard/page.tsx # EOC KPI charts & live feeds
     │   │   │   ├── records/page.tsx   # Paginated disaster datatable grid
     │   │   │   ├── simulation/page.tsx # Interactive timesteps progression center
-    │   │   │   └── [analytics, predictor, similarity, risk-intelligence, cross-border, resources, scenarios, reports, settings, profile] # EOC Placeholder Panels
+    │   │   │   └── [analytics, predictor, similarity, risk-intelligence, resources, scenarios, reports, settings, profile] # EOC Panels
     │   │   ├── globals.css  # Tailwind v4 theme variables configurations
     │   │   └── layout.tsx   # ThemeProvider root configurations
     │   ├── components/

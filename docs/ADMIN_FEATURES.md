@@ -162,33 +162,6 @@ Generated using clustering models.
 
 ---
 
-# Module 5: Cross-Border Risk Assessment
-
-## Purpose
-
-Analyze disaster propagation risk across neighboring regions.
-
-## Example
-
-Cyclone activity in:
-
-* Bangladesh
-* Myanmar
-
-May indicate elevated risk for:
-
-* Odisha
-* Andhra Pradesh
-* Tamil Nadu
-
-## Features
-
-* Neighboring country analysis
-* Regional pattern identification
-* Historical sequence analysis
-
----
-
 # Module 6: Resource Planning Engine
 
 ## Purpose

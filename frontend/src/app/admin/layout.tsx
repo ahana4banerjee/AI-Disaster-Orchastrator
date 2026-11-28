@@ -160,7 +160,6 @@ export default function AdminLayout({
     { name: "Predictor", href: "/admin/predictor", icon: Brain },
     { name: "Similarity Search", href: "/admin/similarity", icon: Search },
     { name: "Risk Intelligence", href: "/admin/risk-intelligence", icon: ShieldAlert },
-    { name: "Cross-Border", href: "/admin/cross-border", icon: Compass },
     { name: "Resources", href: "/admin/resources", icon: Truck },
     { name: "Scenarios", href: "/admin/scenarios", icon: Layers },
     { name: "Simulation Center", href: "/admin/simulation", icon: Activity },
