@@ -53,21 +53,44 @@ async def get_records(
     limit: int = Query(default=20, ge=1, le=100),
     country: Optional[str] = None,
     disasterType: Optional[str] = None,
+    severity: Optional[str] = None,
+    sortBy: str = Query(default="startDate", pattern="^(startDate|magnitude|deaths)$"),
+    sortOrder: str = Query(default="desc", pattern="^(asc|desc)$"),
     current_admin: dict = Depends(get_current_admin),
     db = Depends(get_db)
 ):
     query = {}
-    if country:
-        query["country"] = {"$regex": f"^{country.strip()}$", "$options": "i"}
-    if disasterType:
+    if country and country.strip():
+        term = country.strip()
+        query["$or"] = [
+            {"country": {"$regex": term, "$options": "i"}},
+            {"region": {"$regex": term, "$options": "i"}},
+            {"subregion": {"$regex": term, "$options": "i"}},
+        ]
+    if disasterType and disasterType.strip():
         query["disasterType"] = {"$regex": f"^{disasterType.strip()}$", "$options": "i"}
+    if severity and severity.strip():
+        query["severityClass"] = {"$regex": f"^{severity.strip()}$", "$options": "i"}
+
+    sort_field_map = {
+        "startDate": "startDate",
+        "magnitude": "magnitude",
+        "deaths": "impact.deaths",
+    }
+    mongo_sort_field = sort_field_map.get(sortBy, "startDate")
+    mongo_sort_dir = 1 if sortOrder == "asc" else -1
 
     try:
         total_count = await db.disaster_records.count_documents(query)
         total_pages = (total_count + limit - 1) // limit if total_count > 0 else 0
         
         offset = (page - 1) * limit
-        cursor = db.disaster_records.find(query).sort("startDate", -1).skip(offset).limit(limit)
+        cursor = (
+            db.disaster_records.find(query)
+            .sort([(mongo_sort_field, mongo_sort_dir), ("startDate", -1)])
+            .skip(offset)
+            .limit(limit)
+        )
         records = await cursor.to_list(length=limit)
 
         return {

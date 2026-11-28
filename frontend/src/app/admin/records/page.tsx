@@ -30,6 +30,7 @@ export default function RecordsPage() {
   const [records, setRecords] = useState<DisasterRecord[]>([]);
   const [countryFilter, setCountryFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [severityFilter, setSeverityFilter] = useState("");
   const [sortField, setSortField] = useState<"startDate" | "magnitude" | "deaths">("startDate");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
@@ -54,9 +55,10 @@ export default function RecordsPage() {
     setStatusMessage(null);
     try {
       const token = localStorage.getItem("token") || "";
-      let url = `http://localhost:8000/api/v1/admin/records?page=${page}&limit=10`;
-      if (countryFilter) url += `&country=${encodeURIComponent(countryFilter)}`;
+      let url = `http://127.0.0.1:8000/api/v1/admin/records?page=${page}&limit=10&sortBy=${sortField}&sortOrder=${sortOrder}`;
+      if (countryFilter.trim()) url += `&country=${encodeURIComponent(countryFilter.trim())}`;
       if (typeFilter) url += `&disasterType=${encodeURIComponent(typeFilter)}`;
+      if (severityFilter) url += `&severity=${encodeURIComponent(severityFilter)}`;
 
       const res = await fetch(url, {
         headers: {
@@ -84,11 +86,17 @@ export default function RecordsPage() {
     } catch (err) {
       // Local filter fallback logic
       let filtered = [...mockRecords];
-      if (countryFilter) {
-        filtered = filtered.filter(r => r.country.toLowerCase().includes(countryFilter.toLowerCase()));
+      if (countryFilter.trim()) {
+        const q = countryFilter.trim().toLowerCase();
+        filtered = filtered.filter(
+          (r) => r.country.toLowerCase().includes(q) || (r.region || "").toLowerCase().includes(q)
+        );
       }
       if (typeFilter) {
         filtered = filtered.filter(r => r.disasterType.toLowerCase() === typeFilter.toLowerCase());
+      }
+      if (severityFilter) {
+        filtered = filtered.filter(r => r.severityClass.toLowerCase() === severityFilter.toLowerCase());
       }
       
       // Sort
@@ -124,9 +132,10 @@ export default function RecordsPage() {
 
   useEffect(() => {
     fetchRecords();
-  }, [page, countryFilter, typeFilter, sortField, sortOrder]);
+  }, [page, countryFilter, typeFilter, severityFilter, sortField, sortOrder]);
 
   const handleSort = (field: "startDate" | "magnitude" | "deaths") => {
+    setPage(1);
     if (sortField === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
@@ -170,10 +179,10 @@ export default function RecordsPage() {
       </div>
 
       {/* Filter Row Form */}
-      <div className="bg-bg-secondary border border-border-custom rounded-2xl p-5 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="bg-bg-secondary border border-border-custom rounded-2xl p-5 shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Input
-          label="Filter by Country"
-          placeholder="e.g. India"
+          label="Filter by Country / Region"
+          placeholder="e.g. India or Asia"
           value={countryFilter}
           onChange={(e) => {
             setCountryFilter(e.target.value);
@@ -192,12 +201,31 @@ export default function RecordsPage() {
           id="type-filter"
         >
           <option value="">All Hazards</option>
-          <option value="Cyclone">Cyclone</option>
-          <option value="Earthquake">Earthquake</option>
-          <option value="Wildfire">Wildfire</option>
+          <option value="Storm">Storm / Cyclone</option>
           <option value="Flood">Flood</option>
+          <option value="Earthquake">Earthquake</option>
           <option value="Landslide">Landslide</option>
-          <option value="Tsunami">Tsunami</option>
+          <option value="Drought">Drought</option>
+          <option value="Wildfire">Wildfire</option>
+          <option value="Extreme temperature">Extreme Temperature</option>
+          <option value="Epidemic">Epidemic</option>
+          <option value="Volcanic activity">Volcanic Activity</option>
+        </Select>
+
+        <Select
+          label="Severity"
+          value={severityFilter}
+          onChange={(e) => {
+            setSeverityFilter(e.target.value);
+            setPage(1);
+          }}
+          id="severity-filter"
+        >
+          <option value="">All Severities</option>
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+          <option value="Extreme">Extreme</option>
         </Select>
 
         <div className="flex items-end">
@@ -207,6 +235,7 @@ export default function RecordsPage() {
             onClick={() => {
               setCountryFilter("");
               setTypeFilter("");
+              setSeverityFilter("");
               setPage(1);
             }}
           >
@@ -235,20 +264,20 @@ export default function RecordsPage() {
                   <th className="px-5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">Country</th>
                   <th className="px-5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">Region</th>
                   <th className="px-5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                    <button onClick={() => handleSort("magnitude")} className="flex items-center gap-1 hover:text-text-primary">
-                      Magnitude <ArrowUpDown className="h-3 w-3" />
+                    <button onClick={() => handleSort("magnitude")} className={`flex items-center gap-1 cursor-pointer hover:text-text-primary ${sortField === "magnitude" ? "text-accent-primary" : ""}`}>
+                      Magnitude <ArrowUpDown className="h-3 w-3" /> {sortField === "magnitude" ? (sortOrder === "asc" ? "↑" : "↓") : ""}
                     </button>
                   </th>
                   <th className="px-5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">Severity</th>
                   <th className="px-5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                    <button onClick={() => handleSort("deaths")} className="flex items-center gap-1 hover:text-text-primary">
-                      Fatalities <ArrowUpDown className="h-3 w-3" />
+                    <button onClick={() => handleSort("deaths")} className={`flex items-center gap-1 cursor-pointer hover:text-text-primary ${sortField === "deaths" ? "text-accent-primary" : ""}`}>
+                      Fatalities <ArrowUpDown className="h-3 w-3" /> {sortField === "deaths" ? (sortOrder === "asc" ? "↑" : "↓") : ""}
                     </button>
                   </th>
                   <th className="px-5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">Economic Damage</th>
                   <th className="px-5 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                    <button onClick={() => handleSort("startDate")} className="flex items-center gap-1 hover:text-text-primary">
-                      Date <ArrowUpDown className="h-3 w-3" />
+                    <button onClick={() => handleSort("startDate")} className={`flex items-center gap-1 cursor-pointer hover:text-text-primary ${sortField === "startDate" ? "text-accent-primary" : ""}`}>
+                      Date <ArrowUpDown className="h-3 w-3" /> {sortField === "startDate" ? (sortOrder === "asc" ? "↑" : "↓") : ""}
                     </button>
                   </th>
                 </tr>
