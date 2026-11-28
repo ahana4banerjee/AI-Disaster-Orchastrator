@@ -177,16 +177,17 @@ Each phase contains specific goals, dependencies, deliverables, risks, and crite
 
 ---
 
-## Phase 7: AI Situation Report & Exports
+## Phase 7: AI Situation Report & Exports (Completed)
 
 ### Goals
-* Write the Markdown report compiler that summarizes active simulation runs, resource plans, and key operational warnings.
-* Build the backend PDF renderer module, streaming generated PDF bytes to the client dashboard.
+* Write the Markdown, CSV, and immutable snapshot report compiler summarizing active or completed simulation runs, resource plans, key operational warnings, and AI/ML data provenance. [DONE]
+* Build the non-blocking threadpool PDF renderer (`reportlab`) streaming multi-page EOC PDFs to the client dashboard in `< 3 seconds`. [DONE]
+* **Phase 7.1 (Next)**: Admin Operations & Communication Side Portal displaying live multi-admin operations from `admin_audit_logs` and coordinator handover notes. [PENDING]
 
 ### Deliverables
-* **Report compiler service**: `app/services/report_generator.py` converting JSON schemas to rich Markdown tables.
-* **FastAPI Endpoint**: `/api/v1/reports/{id}/pdf` serving binary document downloads.
-* **UI Export Buttons**: Icons on Next.js to trigger PDF generation and save files.
+* **Report compiler & renderer service**: `backend/app/services/report_generator.py` compiling immutable `ReportSnapshot` payloads to Markdown, structured CSV, and multi-page EOC PDFs. [DONE]
+* **FastAPI Endpoints**: `POST/GET /api/v1/reports/`, `GET /api/v1/reports/{id}`, `/pdf`, `/markdown`, `/csv`, and `DELETE /api/v1/reports/{id}` with `admin_audit_logs` tracking. [DONE]
+* **UI Export & SitRep Portal**: `/admin/reports` live compiler, snapshot preview, and authenticated PDF/Markdown/CSV downloads + quick links from `/admin/simulation` and `/admin/resources`. [DONE]
 
 ### Dependencies
 * Successful completion of Phase 6.

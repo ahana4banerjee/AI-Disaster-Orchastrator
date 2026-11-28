@@ -124,7 +124,7 @@ We follow a progressive roadmap containing clear exit milestones:
 * [x] **Phase 4: Public Portal & Readiness Checker** (Personal Risk Checker, Preparedness Assistant, Family Planner, Readiness Scores, EOC AI Chatbot)
 * [x] **Phase 5: Scenario Template Engine** (Comparing saved simulations side-by-side)
 * [x] **Phase 6: Asynchronous Simulation Engine** (Temporal progression Hour 0–48, WebSocket streaming, infrastructure cascades, SVG transit maps, healthcare trackers, KNN recovery forecasts, Resource Recommendation & Deficit Analyzer, and `/admin/resources` dashboard)
-* [ ] **Phase 7: AI Situation Report & Exports** (Markdown compilers, PDF rendering streams)
+* [x] **Phase 7: AI Situation Report & Exports** (Immutable versioned snapshots, active/incomplete simulation support, AI provenance section, ReportLab multi-page EOC PDFs, Markdown & CSV exports, `/admin/reports` portal; Phase 7.1 Admin Communication Side Portal scoped next)
 * [ ] **Phase 8: Deployment & Optimization** (Docker Compose cluster, Redis cache checks)
 
 ---

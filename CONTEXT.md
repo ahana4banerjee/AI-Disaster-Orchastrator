@@ -231,8 +231,15 @@ When implementing the roadmap, proceed sequentially by reading the current phase
   * Core WebSocket gateway heartbeats, reconnection handling, and live `RESOURCE_UPDATE` / `RESOURCE_FINALIZED` / `SIMULATION_COMPLETED` broadcasts.
   * **Resource Recommendation & Deficit Analyzer (`ResourceEngine`)**: Implements `ML_DESIGN.md` Section 15 formulas (`Ambulances`, `Rescue Teams`, `Medical Teams`, `Relief Camps`, `Food Units`) scaled dynamically by infrastructure disruptions (e.g. Road Network Failed +25% ambulance demand, Hospitals Critical +30% medical teams), computing `Deficit = max(Required - Available, 0)` with `EMERALD` / `AMBER` / `CRIMSON` status classifications.
   * **Resource APIs & Admin UI (`/admin/resources`)**: Full REST endpoints under `/api/v1/resources/simulations/{id}` (plan, deficits, summary, inventory update) and interactive EOC Resource Planning Dashboard with overview cards, shortfall progress bars, timeline analysis (`Hour 0..48`), critical shortage alerts, inventory editor, and consolidated final assessment.
-* **Next Phase**:
-  * **Phase 7: AI Situation Report & Exports**: Compile simulation metrics, cascading logs, and `resource_plans` deficits into Markdown situation reports and downloadable PDFs.
+### Phase 7: AI Situation Report & Exports (Completed)
+* **Completed Scaffolding**:
+  * **Immutable Versioned Snapshot Pipeline (`ReportGenerator`)**: `backend/app/services/report_generator.py` & `backend/app/models/schemas/report.py` compile `ReportSnapshot` (`reportCode`, `version`, `generatedAt`, `compiledBy`, `sourceSimulationUpdatedAt`, `simulationStatus`, `executedTimesteps`, `pendingTimesteps`, `resourcePlanStatus`, `sections`, `provenance`) into MongoDB `ai_reports` atomically.
+  * **Multi-Format Renderers**: Deterministic Markdown, structured UTF-8 CSV, and `reportlab` multi-page EOC PDF (`Page X of Y` + `reportCode` footers, severity badges, `repeatRows=1` repeating headers, Table of Contents) executed inside `asyncio.to_thread`.
+  * **Reports API & Audit Logging (`reports.py`)**: Full shared-admin CRUD & export endpoints (`POST /`, `GET /`, `GET /{id}`, `/pdf`, `/markdown`, `/csv`, `DELETE /{id}`) with input/filename sanitization and `admin_audit_logs` recording.
+  * **Admin Portal (`/admin/reports`)**: Live SitRep compiler, immutable snapshot preview, raw Markdown toggle, and authenticated PDF/Markdown/CSV downloads, linked from `/admin/simulation` and `/admin/resources`.
+* **Next Milestones**:
+  * **Phase 7.1**: Admin Operations & Communication Side Portal (live multi-admin activity feed from `admin_audit_logs` + coordinator handover notes).
+  * **Phase 8: Deployment & Optimization**: Docker Compose cluster and Redis caching.
 
 
 
