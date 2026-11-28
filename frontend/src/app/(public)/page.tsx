@@ -210,29 +210,7 @@ export default function PublicHomePage() {
         </div>
       </section>
 
-      {/* Preparedness CTA banner */}
-      <section className="bg-accent-primary text-white py-16 px-6 border-t border-border-custom text-center">
-        <div className="max-w-[800px] mx-auto space-y-6">
-          <h3 className="text-2xl md:text-3xl font-extrabold tracking-tight uppercase">
-            Are You Prepared for a Crisis Event?
-          </h3>
-          <p className="text-xs md:text-sm text-indigo-100 max-w-[600px] mx-auto leading-relaxed">
-            Create your account today to save custom evacuation plans, calculate your family readiness score gauge, and receive localized emergency alerts.
-          </p>
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link href="/register">
-              <Button className="w-full sm:w-auto bg-white hover:bg-slate-100 text-accent-primary border-none">
-                Register Preparedness Account
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button className="w-full sm:w-auto bg-transparent hover:bg-indigo-750 text-white border border-indigo-200">
-                Operator Login
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+
 
     </div>
   );
