@@ -320,3 +320,102 @@ async def get_regional_risk_by_subregion(subregion: str, db = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+
+
+@router.get("/risk-hotspots")
+async def get_risk_hotspots(
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """
+    Aggregates real geospatial hotspots by country/place from EM-DAT disaster_records
+    joined with K-Means regional_risk_clusters for Risk Intelligence mapping.
+    """
+    try:
+        cluster_docs = await db.regional_risk_clusters.find({}).to_list(length=100)
+        cluster_by_subregion = {
+            (c.get("subregion") or "").lower().strip(): c for c in cluster_docs
+        }
+
+        pipeline = [
+            {"$match": {"geoJSON.coordinates": {"$type": "array"}}},
+            {
+                "$group": {
+                    "_id": {"country": "$country", "subregion": "$subregion", "disasterType": "$disasterType"},
+                    "typeCount": {"$sum": 1},
+                    "avgLat": {"$avg": {"$arrayElemAt": ["$geoJSON.coordinates", 1]}},
+                    "avgLon": {"$avg": {"$arrayElemAt": ["$geoJSON.coordinates", 0]}},
+                    "avgMag": {"$avg": "$magnitude"},
+                    "maxMag": {"$max": "$magnitude"},
+                    "avgDeaths": {"$avg": "$impact.deaths"},
+                    "highCount": {
+                        "$sum": {
+                            "$cond": [{"$in": ["$severityClass", ["High", "Extreme"]]}, 1, 0]
+                        }
+                    },
+                }
+            },
+            {"$sort": {"typeCount": -1}},
+            {
+                "$group": {
+                    "_id": "$_id.country",
+                    "subregion": {"$first": "$_id.subregion"},
+                    "predictedDisasterType": {"$first": "$_id.disasterType"},
+                    "eventCount": {"$sum": "$typeCount"},
+                    "latitude": {"$avg": "$avgLat"},
+                    "longitude": {"$avg": "$avgLon"},
+                    "avgMag": {"$avg": "$avgMag"},
+                    "maxMag": {"$max": "$maxMag"},
+                    "avgDeaths": {"$avg": "$avgDeaths"},
+                    "highEvents": {"$sum": "$highCount"},
+                }
+            },
+            {"$sort": {"eventCount": -1}},
+            {"$limit": 250},
+        ]
+
+        agg_docs = await db.disaster_records.aggregate(pipeline).to_list(length=250)
+
+        hotspots = []
+        for doc in agg_docs:
+            lat = doc.get("latitude")
+            lon = doc.get("longitude")
+            if lat is None or lon is None:
+                continue
+
+            subregion = doc.get("subregion") or "Global"
+            cluster_info = cluster_by_subregion.get(subregion.lower().strip(), {})
+            raw_tier = (cluster_info.get("riskTier") or "").strip()
+
+            event_count = int(doc.get("eventCount") or 0)
+            high_ratio = (doc.get("highEvents") or 0) / max(1, event_count)
+
+            # Map into Low, Medium, High risk levels cleanly
+            if event_count >= 120 or (raw_tier in ("Extreme", "High") and high_ratio >= 0.35):
+                risk_level = "High"
+            elif event_count >= 30 or high_ratio >= 0.15:
+                risk_level = "Medium"
+            else:
+                risk_level = "Low"
+
+            mag_val = doc.get("avgMag") or doc.get("maxMag") or cluster_info.get("maxMagnitude")
+            predicted_mag = round(float(mag_val), 1) if mag_val is not None else None
+
+            hotspots.append({
+                "place": doc.get("_id") or "Unknown",
+                "subregion": subregion,
+                "latitude": round(float(lat), 4),
+                "longitude": round(float(lon), 4),
+                "predictedDisasterType": doc.get("predictedDisasterType") or "Storm",
+                "predictedMagnitude": predicted_mag,
+                "eventCount": event_count,
+                "riskLevel": risk_level,
+                "clusterId": int(cluster_info.get("clusterId", 0)),
+            })
+
+        return {
+            "totalHotspots": len(hotspots),
+            "hotspots": hotspots,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database aggregation error: {str(e)}")
