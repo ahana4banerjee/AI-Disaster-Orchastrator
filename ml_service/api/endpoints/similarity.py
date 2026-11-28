@@ -64,8 +64,11 @@ async def run_similarity(payload: dict):
     lon = 0.0
     centroids = cache["centroids"]
     country_map = {
-        "india": "IND", "kenya": "KEN", "bangladesh": "BGD", "nepal": "NPL", 
-        "philippines": "PHL", "indonesia": "IDN", "sri lanka": "LKA"
+        "india": "IND", "kenya": "KEN", "bangladesh": "BGD", "nepal": "NPL",
+        "philippines": "PHL", "indonesia": "IDN", "sri lanka": "LKA",
+        "japan": "JPN", "united states": "USA", "usa": "USA", "china": "CHN",
+        "turkey": "TUR", "brazil": "BRA", "mexico": "MEX", "pakistan": "PAK",
+        "italy": "ITA", "greece": "GRC", "australia": "AUS",
     }
     for code, info in centroids.items():
         if isinstance(info, dict):
@@ -127,12 +130,13 @@ async def run_similarity(payload: dict):
         scaler = cache["scaler"]
         query_vector = scaler.transform(X_features)
         
-        # Run KNN query
-        knn = cache["knn"]
-        distances, indices = knn.kneighbors(query_vector)
-        
         # Load pre-saved lookup records
         records = cache["records"]
+
+        # Run KNN query across enough neighbors to guarantee up to 5 same-type matches
+        knn = cache["knn"]
+        k_search = min(len(records), 2000)
+        distances, indices = knn.kneighbors(query_vector, n_neighbors=k_search)
         
         results = []
         for dist, idx in zip(distances[0], indices[0]):
@@ -146,15 +150,29 @@ async def run_similarity(payload: dict):
             
             mag_val = rec["magnitude"]
             mag_float = float(mag_val) if pd.notnull(mag_val) and str(mag_val).strip() != "" else None
+            deaths_val = int(rec['deaths'])
+            aff_val = int(rec['affected'])
+            dmg_val = float(rec['damage'])
+
+            if deaths_val >= 100 or aff_val >= 100000:
+                sev_class = "Extreme"
+            elif deaths_val >= 20 or aff_val >= 20000:
+                sev_class = "High"
+            elif deaths_val >= 3 or aff_val >= 2000:
+                sev_class = "Moderate"
+            else:
+                sev_class = "Low"
             
             results.append({
                 "year": int(rec['year']),
+                "disasterType": str(rec['disasterType']),
                 "country": str(rec['country']),
                 "location": str(rec['location']),
                 "magnitude": mag_float,
-                "deaths": int(rec['deaths']),
-                "affectedPopulation": int(rec['affected']),
-                "economicDamageUSD": float(rec['damage']),
+                "deaths": deaths_val,
+                "affectedPopulation": aff_val,
+                "economicDamageUSD": dmg_val,
+                "severityClass": sev_class,
                 "similarityPercentage": round(sim_pct, 2)
             })
             
