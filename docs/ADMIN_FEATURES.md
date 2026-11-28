@@ -378,7 +378,7 @@ Display:
 
 ---
 
-# Module 14: Admin Operations & Communication Side Portal (Phase 7.1)
+# Module 14: Admin Operations & Communication Side Portal
 
 ## Purpose
 

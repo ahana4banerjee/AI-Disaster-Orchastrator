@@ -182,7 +182,7 @@ Each phase contains specific goals, dependencies, deliverables, risks, and crite
 ### Goals
 * Write the Markdown, CSV, and immutable snapshot report compiler summarizing active or completed simulation runs, resource plans, key operational warnings, and AI/ML data provenance. [DONE]
 * Build the non-blocking threadpool PDF renderer (`reportlab`) streaming multi-page EOC PDFs to the client dashboard in `< 3 seconds`. [DONE]
-* **Phase 7.1 (Next)**: Admin Operations & Communication Side Portal displaying live multi-admin operations from `admin_audit_logs` and coordinator handover notes. [PENDING]
+* Admin Operations & Communication Side Portal displaying live multi-admin operations from `admin_audit_logs` and coordinator handover notes. [DONE]
 
 ### Deliverables
 * **Report compiler & renderer service**: `backend/app/services/report_generator.py` compiling immutable `ReportSnapshot` payloads to Markdown, structured CSV, and multi-page EOC PDFs. [DONE]

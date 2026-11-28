@@ -238,7 +238,7 @@ When implementing the roadmap, proceed sequentially by reading the current phase
   * **Reports API & Audit Logging (`reports.py`)**: Full shared-admin CRUD & export endpoints (`POST /`, `GET /`, `GET /{id}`, `/pdf`, `/markdown`, `/csv`, `DELETE /{id}`) with input/filename sanitization and `admin_audit_logs` recording.
   * **Admin Portal (`/admin/reports`)**: Live SitRep compiler, immutable snapshot preview, raw Markdown toggle, and authenticated PDF/Markdown/CSV downloads, linked from `/admin/simulation` and `/admin/resources`.
 * **Next Milestones**:
-  * **Phase 7.1**: Admin Operations & Communication Side Portal (live multi-admin activity feed from `admin_audit_logs` + coordinator handover notes).
+  * **Phase 7.1 (Completed)**: Admin Operations & Communication Side Portal (`AdminCommsDrawer` in `admin/layout.tsx`, `GET /api/v1/admin/activity-feed`, `GET/POST /api/v1/admin/communications` persisted in `admin_communications`).
   * **Phase 8: Deployment & Optimization**: Docker Compose cluster and Redis caching.
 
 
